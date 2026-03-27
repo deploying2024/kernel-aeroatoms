@@ -8,8 +8,9 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title       : 'Kernel — AeroAtoms',
   description : 'AeroAtoms Operations Platform — Orders, Inventory, Yield Tracking',
-  icons       : { icon: '/logo.png' },
+  applicationName: 'Kernel',
 }
+export const runtime = 'edge'
 
 export default function RootLayout({
   children,
