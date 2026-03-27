@@ -1,4 +1,4 @@
-export const runtime = 'edge'
+// export const runtime = 'edge'
 import { createClient } from '@/lib/supabase/server'
 import InventoryValueClient from '@/components/inventory/inventory-value-client'
 import { BarChart3 } from 'lucide-react'

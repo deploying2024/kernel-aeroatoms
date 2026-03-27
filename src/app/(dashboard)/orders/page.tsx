@@ -1,4 +1,4 @@
-export const runtime = 'edge'
+// export const runtime = 'edge'
 import { createClient } from '@/lib/supabase/server'
 import OrderForm from '@/components/order-form'
 import OrderHistory from '@/components/order-history'

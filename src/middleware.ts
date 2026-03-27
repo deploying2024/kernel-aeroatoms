@@ -1,19 +1,16 @@
-export const runtime = 'edge'
-
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
+  const { pathname } = request.nextUrl
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
+        getAll() { return request.cookies.getAll() },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
@@ -27,18 +24,21 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error } = await supabase.auth.getUser()
 
-  const { pathname } = request.nextUrl
-
-  // Not logged in and not on login page → redirect to login
-  if (!user && pathname !== '/login') {
-    return NextResponse.redirect(new URL('/login', request.url))
+  if (pathname.startsWith('/login')) {
+    if (user && !error) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+    return supabaseResponse
   }
 
-  // Logged in and on login page → redirect to dashboard
-  if (user && pathname === '/login') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  if (!user || error) {
+    const res = NextResponse.redirect(new URL('/login', request.url))
+    request.cookies.getAll().forEach(({ name }) => {
+      if (name.startsWith('sb-')) res.cookies.delete(name)
+    })
+    return res
   }
 
   return supabaseResponse
