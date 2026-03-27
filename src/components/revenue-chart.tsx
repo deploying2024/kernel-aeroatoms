@@ -5,9 +5,13 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 
-type Props = { data: { month: string; total: number }[] }
+type TooltipProps = {
+  active?  : boolean
+  payload? : { value: number }[]
+  label?   : string
+}
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
   if (active && payload?.length) {
     return (
       <div style={{
@@ -25,6 +29,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   }
   return null
 }
+
+type Props = { data: { month: string; total: number }[] }
 
 export default function RevenueChart({ data }: Props) {
   if (data.length === 0) {
