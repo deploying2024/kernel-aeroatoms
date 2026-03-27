@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -26,15 +25,6 @@ export default function LoginPage() {
     if (error) { setError(error.message); setLoading(false); return }
     router.push('/dashboard')
     router.refresh()
-  }
-
-  const handleSignUp = async () => {
-    setLoading(true); setError(null)
-    const supabase = createClient()
-    const { error } = await supabase.auth.signUp({ email, password })
-    if (error) { setError(error.message); setLoading(false); return }
-    setError('Check your email to confirm your account.')
-    setLoading(false)
   }
 
   return (
@@ -76,13 +66,17 @@ export default function LoginPage() {
             Welcome back
           </CardTitle>
           <CardDescription style={{ color: 'var(--text-secondary)' }}>
-            Sign in to your account to continue
+            Sign in with your invited account
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+
+          {/* Email */}
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wider"
-              style={{ color: 'var(--text-secondary)' }}>
+            <Label
+              className="text-xs font-semibold uppercase tracking-wider"
+              style={{ color: 'var(--text-secondary)' }}
+            >
               Email
             </Label>
             <Input
@@ -90,6 +84,7 @@ export default function LoginPage() {
               placeholder="you@aeroatoms.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
               className="h-11 border rounded-lg text-sm"
               style={{
                 background  : 'var(--bg-input)',
@@ -99,9 +94,12 @@ export default function LoginPage() {
             />
           </div>
 
+          {/* Password */}
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wider"
-              style={{ color: 'var(--text-secondary)' }}>
+            <Label
+              className="text-xs font-semibold uppercase tracking-wider"
+              style={{ color: 'var(--text-secondary)' }}
+            >
               Password
             </Label>
             <Input
@@ -119,18 +117,21 @@ export default function LoginPage() {
             />
           </div>
 
+          {/* Error */}
           {error && (
             <p
               className="text-sm px-3 py-2.5 rounded-lg"
-              style={error.includes('Check your email')
-                ? { background: '#10b98110', border: '1px solid #10b98128', color: '#10b981' }
-                : { background: '#ef444410', border: '1px solid #ef444430', color: '#ef4444' }
-              }
+              style={{
+                background : '#ef444410',
+                border     : '1px solid #ef444430',
+                color      : '#ef4444',
+              }}
             >
               {error}
             </p>
           )}
 
+          {/* Sign in button */}
           <button
             onClick={handleLogin}
             disabled={loading}
@@ -140,34 +141,19 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign In'}
           </button>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" style={{ borderColor: 'var(--border-dim)' }} />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="px-2 text-xs" style={{ background: 'var(--bg-card)', color: 'var(--text-dim)' }}>
-                or
-              </span>
-            </div>
-          </div>
-
-          <button
-            onClick={handleSignUp}
-            disabled={loading}
-            className="w-full h-11 rounded-lg text-sm font-semibold border disabled:opacity-50 transition-all"
-            style={{
-              borderColor : 'var(--border-dim)',
-              color       : 'var(--text-secondary)',
-              background  : 'transparent',
-            }}
+          {/* Invite only notice */}
+          <p
+            className="text-center text-xs pt-1"
+            style={{ color: 'var(--text-dim)' }}
           >
-            Create Account
-          </button>
+            🔒 Invite only — contact your admin for access
+          </p>
+
         </CardContent>
       </Card>
 
       <p className="text-center text-xs mt-6" style={{ color: 'var(--text-dim)' }}>
-        Kernel © {new Date().getFullYear()} · AeroAtoms
+        Kernel © {new Date().getFullYear()} · AeroAtoms · Invite Only
       </p>
     </div>
   )
