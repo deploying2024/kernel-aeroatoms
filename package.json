@@ -2,12 +2,12 @@
   "name": "aeroatoms",
   "version": "0.1.0",
   "private": true,
-"scripts": {
-  "dev"  : "next dev",
-  "build": "next build",
-  "start": "next start",
-  "lint" : "next lint"
-},
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
   "dependencies": {
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.100.1",
@@ -17,6 +17,7 @@
     "date-fns": "^4.1.0",
     "lucide-react": "^1.7.0",
     "next": "15.5.2",
+    "next-pwa": "^5.6.0",
     "next-themes": "^0.4.6",
     "radix-ui": "^1.4.3",
     "react": "19.2.4",

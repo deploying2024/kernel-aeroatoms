@@ -1,7 +1,7 @@
 export const runtime = 'edge'
+
 import { createClient } from '@/lib/supabase/server'
-import OrderForm from '@/components/order-form'
-import OrderHistory from '@/components/order-history'
+import OrdersPageClient from '@/components/orders-page-client'
 import { ShoppingCart } from 'lucide-react'
 import type { GroupedOrder, OrderRow } from '@/lib/types'
 
@@ -49,38 +49,34 @@ export default async function OrdersPage() {
   return (
     <div className="min-h-screen grid-bg animate-fade-up">
       {/* Page Header */}
-      <div className="px-6 md:px-10 pt-8 pb-6 border-b"
-        style={{ borderColor: 'var(--border-dim)', background: 'var(--bg-secondary)' }}>
+      <div
+        className="px-6 md:px-10 pt-8 pb-6 border-b"
+        style={{ borderColor: 'var(--border-dim)', background: 'var(--bg-secondary)' }}
+      >
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center glow-blue"
-            style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent-border)' }}>
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center glow-blue"
+            style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent-border)' }}
+          >
             <ShoppingCart className="w-4 h-4" style={{ color: 'var(--accent)' }} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            <h1 className="text-2xl font-bold tracking-tight"
+              style={{ color: 'var(--text-primary)' }}>
               Orders
             </h1>
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              Create and manage all AeroAtoms orders
+              Manage orders and view client list
             </p>
           </div>
         </div>
       </div>
 
-      <div className="px-6 md:px-10 py-8 space-y-10">
-        {/* New order form */}
-        <OrderForm
-          companies={companies ?? []}
-          products={products   ?? []}
-        />
-
-        {/* Order history */}
-        <OrderHistory
-          orders={groupedOrders}
-          companies={companies ?? []}
-          products={products   ?? []}
-        />
-      </div>
+      <OrdersPageClient
+        companies={companies ?? []}
+        products={products ?? []}
+        groupedOrders={groupedOrders}
+      />
     </div>
   )
 }

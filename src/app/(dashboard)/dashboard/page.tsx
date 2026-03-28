@@ -2,81 +2,123 @@ export const runtime = 'edge'
 import { createClient } from '@/lib/supabase/server'
 import {
   TrendingUp, ShoppingCart, Building2,
-  Package, Activity,
+  Package, Activity, DollarSign,
 } from 'lucide-react'
 import RevenueChart from '@/components/revenue-chart'
+
+async function getUsdRate(): Promise<number> {
+  try {
+    const res = await fetch(
+      'https://api.frankfurter.app/latest?from=INR&to=USD',
+      { next: { revalidate: 3600 } } // cache for 1 hour
+    )
+    const data = await res.json()
+    return data.rates.USD ?? 0.012
+  } catch {
+    return 0.012 // fallback rate
+  }
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient()
 
-  const { data: revenueData } = await supabase
-    .from('order_summary').select('line_total')
-  const totalRevenue = revenueData?.reduce((s, r) => s + (r.line_total ?? 0), 0) ?? 0
+  const [usdRate, revenueData, ordersData, productData, companyData, chartRaw] =
+    await Promise.all([
+      getUsdRate(),
+      supabase.from('order_summary').select('line_total'),
+      supabase.from('order_summary').select('order_id'),
+      supabase.from('order_summary').select('product_name, quantity'),
+      supabase.from('order_summary').select('company_name, line_total'),
+      supabase.from('order_summary').select('order_date, line_total').order('order_date', { ascending: true }),
+    ])
 
-  const { data: ordersData } = await supabase
-    .from('order_summary').select('order_id')
-  const totalOrders = new Set(ordersData?.map(r => r.order_id)).size
+  const totalRevenue = revenueData.data?.reduce((s, r) => s + (r.line_total ?? 0), 0) ?? 0
+  const totalRevenueUSD = totalRevenue * usdRate
+  const totalOrders = new Set(ordersData.data?.map(r => r.order_id)).size
 
-  const { data: productData } = await supabase
-    .from('order_summary').select('product_name, quantity')
+  // Total units sold
+  const totalUnitsSold = productData.data?.reduce((s, r) => s + (r.quantity ?? 0), 0) ?? 0
+
+  // Product map
   const productMap: Record<string, number> = {}
-  productData?.forEach(r => {
+  productData.data?.forEach(r => {
     if (!r.product_name) return
     productMap[r.product_name] = (productMap[r.product_name] ?? 0) + (r.quantity ?? 0)
   })
   const topProducts = Object.entries(productMap).sort((a, b) => b[1] - a[1]).slice(0, 5)
 
-  const { data: companyData } = await supabase
-    .from('order_summary').select('company_name, line_total')
+  // Company map
   const companyMap: Record<string, number> = {}
-  companyData?.forEach(r => {
+  companyData.data?.forEach(r => {
     if (!r.company_name) return
     companyMap[r.company_name] = (companyMap[r.company_name] ?? 0) + (r.line_total ?? 0)
   })
   const topCompanies = Object.entries(companyMap).sort((a, b) => b[1] - a[1]).slice(0, 5)
   const totalCompanies = Object.keys(companyMap).length
 
-  const { data: chartRaw } = await supabase
-    .from('order_summary').select('order_date, line_total').order('order_date', { ascending: true })
+  // Chart data
   const monthMap: Record<string, number> = {}
-  chartRaw?.forEach(r => {
+  chartRaw.data?.forEach(r => {
     if (!r.order_date) return
     const m = r.order_date.slice(0, 7)
     monthMap[m] = (monthMap[m] ?? 0) + (r.line_total ?? 0)
   })
   const revenueByMonth = Object.entries(monthMap).map(([month, total]) => ({ month, total }))
 
-  const fmt = (n: number) =>
+  const fmtINR = (n: number) =>
     new Intl.NumberFormat('en-IN', {
       style                : 'currency',
       currency             : 'INR',
       maximumFractionDigits: 0,
     }).format(n)
 
-  const maxUnits   = topProducts[0]?.[1]  ?? 1
-  const maxRevenue = topCompanies[0]?.[1] ?? 1
+  const fmtUSD = (n: number) =>
+    new Intl.NumberFormat('en-US', {
+      style                : 'currency',
+      currency             : 'USD',
+      maximumFractionDigits: 2,
+    }).format(n)
 
   const stats = [
     {
-      label : 'Total Revenue',
-      value : fmt(totalRevenue),
-      icon  : TrendingUp,
-      color : 'var(--neon-blue)',
-      badge : 'All time',
+      label   : 'Total Revenue',
+      value   : fmtINR(totalRevenue),
+      subvalue: fmtUSD(totalRevenueUSD),
+      sublabel: `@ 1 USD = ₹${(1 / usdRate).toFixed(2)}`,
+      icon    : TrendingUp,
+      color   : '#3b82f6',
+      badge   : 'All time',
+      wide    : true,
     },
     {
-      label : 'Total Orders',
-      value : String(totalOrders),
-      icon  : ShoppingCart,
-      color : 'var(--neon-purple)',
-      badge : 'Orders',
+      label   : 'Total Orders',
+      value   : String(totalOrders),
+      subvalue: null,
+      sublabel: 'orders placed',
+      icon    : ShoppingCart,
+      color   : '#8b5cf6',
+      badge   : 'Orders',
+      wide    : false,
     },
     {
-      label : 'Total Companies',
-      value : String(totalCompanies),
-      icon  : Building2,
-      color : 'var(--neon-green)',
-      badge : 'Clients',
+      label   : 'Units Sold',
+      value   : totalUnitsSold.toLocaleString(),
+      subvalue: null,
+      sublabel: 'across all orders',
+      icon    : Package,
+      color   : '#f59e0b',
+      badge   : 'Products',
+      wide    : false,
+    },
+    {
+      label   : 'Companies',
+      value   : String(totalCompanies),
+      subvalue: null,
+      sublabel: 'active clients',
+      icon    : Building2,
+      color   : '#10b981',
+      badge   : 'Clients',
+      wide    : false,
     },
   ]
 
@@ -91,20 +133,26 @@ export default async function DashboardPage() {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <Activity className="w-4 h-4" style={{ color: 'var(--accent)' }} />   
+              <Activity className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+              <span className="text-xs uppercase tracking-widest font-semibold"
+                style={{ color: 'var(--accent)' }}>
+                Live Overview
+              </span>
             </div>
             <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
               Dashboard
             </h1>
-<p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-  Kernel · AeroAtoms Operations
-</p>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+              Kernel · AeroAtoms Operations
+            </p>
           </div>
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full"
-            style={{ background: '#00ff9f10', border: '1px solid #00ff9f25' }}>
+          <div
+            className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full"
+            style={{ background: '#10b98110', border: '1px solid #10b98128' }}
+          >
             <div className="w-1.5 h-1.5 rounded-full animate-pulse"
-              style={{ background: 'var(--neon-green)' }} />
-            <span className="text-xs font-medium" style={{ color: 'var(--neon-green)' }}>
+              style={{ background: '#10b981' }} />
+            <span className="text-xs font-medium" style={{ color: '#10b981' }}>
               System Online
             </span>
           </div>
@@ -114,47 +162,68 @@ export default async function DashboardPage() {
       <div className="px-6 md:px-10 py-8 space-y-8">
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map(s => {
             const Icon = s.icon
             return (
               <div
                 key={s.label}
-                className="relative rounded-2xl p-6 overflow-hidden transition-all duration-200 hover:scale-[1.02] border"
+                className="relative rounded-2xl border p-5 overflow-hidden transition-all duration-200 hover:scale-[1.02]"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border-dim)' }}
               >
+                {/* Glow blob */}
                 <div
-                  className="absolute -top-6 -right-6 w-28 h-28 rounded-full blur-2xl opacity-20 pointer-events-none"
+                  className="absolute -top-4 -right-4 w-20 h-20 rounded-full blur-2xl opacity-15 pointer-events-none"
                   style={{ background: s.color }}
                 />
-                <div className="flex items-center justify-between mb-5">
+
+                {/* Top row */}
+                <div className="flex items-center justify-between mb-4">
                   <div
-                    className="flex items-center justify-center w-10 h-10 rounded-xl"
+                    className="flex items-center justify-center w-9 h-9 rounded-xl"
                     style={{
-                      background : `color-mix(in srgb, ${s.color} 12%, transparent)`,
-                      border     : `1px solid color-mix(in srgb, ${s.color} 30%, transparent)`,
+                      background : `${s.color}15`,
+                      border     : `1px solid ${s.color}30`,
                     }}
                   >
-                    <Icon className="w-5 h-5" style={{ color: s.color }} />
+                    <Icon className="w-4 h-4" style={{ color: s.color }} />
                   </div>
                   <span
-                    className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full"
-                    style={{
-                      background : `color-mix(in srgb, ${s.color} 12%, transparent)`,
-                      color      : s.color,
-                    }}
+                    className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full"
+                    style={{ background: `${s.color}15`, color: s.color }}
                   >
                     {s.badge}
                   </span>
                 </div>
+
+                {/* Label */}
                 <p className="text-xs font-semibold uppercase tracking-wider mb-1"
                   style={{ color: 'var(--text-secondary)' }}>
                   {s.label}
                 </p>
-                <p className="text-2xl font-bold tracking-tight"
+
+                {/* Main value */}
+                <p className="text-2xl font-black tracking-tight"
                   style={{ color: 'var(--text-primary)' }}>
                   {s.value}
                 </p>
+
+                {/* USD subvalue for revenue */}
+                {s.subvalue && (
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <DollarSign className="w-3 h-3" style={{ color: '#10b981' }} />
+                    <span className="text-sm font-bold" style={{ color: '#10b981' }}>
+                      {s.subvalue}
+                    </span>
+                  </div>
+                )}
+
+                {/* Sublabel */}
+                <p className="text-xs mt-1" style={{ color: 'var(--text-dim)' }}>
+                  {s.sublabel}
+                </p>
+
+                {/* Bottom accent line */}
                 <div
                   className="absolute bottom-0 left-0 right-0 h-0.5 rounded-b-2xl"
                   style={{ background: `linear-gradient(90deg, ${s.color}, transparent)` }}
@@ -184,7 +253,7 @@ export default async function DashboardPage() {
             </div>
             <div className="ml-auto flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full" style={{ background: 'var(--accent)' }} />
-              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Monthly Revenue</span>
+              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Monthly Revenue (₹)</span>
             </div>
           </div>
           <RevenueChart data={revenueByMonth} />
@@ -202,11 +271,11 @@ export default async function DashboardPage() {
               <div
                 className="w-7 h-7 rounded-lg flex items-center justify-center"
                 style={{
-                  background : 'color-mix(in srgb, var(--neon-purple) 12%, transparent)',
-                  border     : '1px solid color-mix(in srgb, var(--neon-purple) 25%, transparent)',
+                  background : '#8b5cf615',
+                  border     : '1px solid #8b5cf628',
                 }}
               >
-                <Package className="w-4 h-4" style={{ color: 'var(--neon-purple)' }} />
+                <Package className="w-4 h-4" style={{ color: '#8b5cf6' }} />
               </div>
               <div>
                 <h2 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
@@ -229,7 +298,7 @@ export default async function DashboardPage() {
                         style={{ color: 'var(--text-primary)' }}>{name}</span>
                     </div>
                     <span className="text-xs font-semibold"
-                      style={{ color: 'var(--neon-purple)' }}>{units} units</span>
+                      style={{ color: '#8b5cf6' }}>{units} units</span>
                   </div>
                   <div className="h-1.5 rounded-full overflow-hidden"
                     style={{ background: 'var(--border-dim)' }}>
@@ -237,7 +306,7 @@ export default async function DashboardPage() {
                       className="h-full rounded-full transition-all duration-700"
                       style={{
                         width      : `${(units / (topProducts[0]?.[1] ?? 1)) * 100}%`,
-                        background : 'linear-gradient(90deg, var(--neon-purple), var(--neon-blue))',
+                        background : 'linear-gradient(90deg, #8b5cf6, #3b82f6)',
                       }}
                     />
                   </div>
@@ -255,11 +324,11 @@ export default async function DashboardPage() {
               <div
                 className="w-7 h-7 rounded-lg flex items-center justify-center"
                 style={{
-                  background : 'color-mix(in srgb, var(--neon-green) 12%, transparent)',
-                  border     : '1px solid color-mix(in srgb, var(--neon-green) 25%, transparent)',
+                  background : '#10b98115',
+                  border     : '1px solid #10b98128',
                 }}
               >
-                <Building2 className="w-4 h-4" style={{ color: 'var(--neon-green)' }} />
+                <Building2 className="w-4 h-4" style={{ color: '#10b981' }} />
               </div>
               <div>
                 <h2 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
@@ -282,7 +351,7 @@ export default async function DashboardPage() {
                         style={{ color: 'var(--text-primary)' }}>{name}</span>
                     </div>
                     <span className="text-xs font-semibold"
-                      style={{ color: 'var(--neon-green)' }}>{fmt(revenue)}</span>
+                      style={{ color: '#10b981' }}>{fmtINR(revenue)}</span>
                   </div>
                   <div className="h-1.5 rounded-full overflow-hidden"
                     style={{ background: 'var(--border-dim)' }}>
@@ -290,7 +359,7 @@ export default async function DashboardPage() {
                       className="h-full rounded-full transition-all duration-700"
                       style={{
                         width      : `${(revenue / (topCompanies[0]?.[1] ?? 1)) * 100}%`,
-                        background : 'linear-gradient(90deg, var(--neon-green), var(--neon-blue))',
+                        background : 'linear-gradient(90deg, #10b981, #3b82f6)',
                       }}
                     />
                   </div>

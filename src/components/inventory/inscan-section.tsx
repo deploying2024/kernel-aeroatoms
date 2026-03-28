@@ -7,40 +7,53 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import {
-  Select, SelectContent, SelectItem,
-  SelectTrigger, SelectValue,
-} from '@/components/ui/select'
 import { format } from 'date-fns'
 import {
   CalendarIcon, PackagePlus, Hash,
-  DollarSign, FileText, X, Check,
+  DollarSign, FileText, X, Check, Plus,
 } from 'lucide-react'
 import CreatableCombobox from '@/components/creatable-combobox'
 import type { Vendor, Material } from '@/lib/types'
 
-const MATERIAL_TYPES = [
-  'IC / Microcontroller',
-  'Passive Component',
-  'Sensor / Module',
-  'Connector / Cable',
-  'Other',
-]
-
-// Mini modal that appears when user wants to create a new material
+// ── Create Material Modal ──────────────────────────────────────────────────
 function CreateMaterialModal({
   name,
+  initialTypes,
   onConfirm,
   onCancel,
 }: {
-  name     : string
-  onConfirm: (type: string, description: string) => Promise<void>
-  onCancel : () => void
+  name         : string
+  initialTypes : string[]
+  onConfirm    : (type: string, description: string) => Promise<void>
+  onCancel     : () => void
 }) {
   const [type,        setType]        = useState('')
   const [description, setDescription] = useState('')
   const [saving,      setSaving]      = useState(false)
   const [err,         setErr]         = useState('')
+  const [types,       setTypes]       = useState(initialTypes)
+  const [showNewType, setShowNewType] = useState(false)
+  const [newTypeName, setNewTypeName] = useState('')
+  const [savingType,  setSavingType]  = useState(false)
+
+  const handleAddType = async () => {
+    const trimmed = newTypeName.trim()
+    if (!trimmed) return
+    setSavingType(true)
+    const sb = createClient()
+    const { data, error } = await sb
+      .from('component_types')
+      .insert({ name: trimmed })
+      .select()
+      .single()
+    if (!error && data) {
+      setTypes(prev => [...prev, data.name])
+      setType(data.name)
+      setNewTypeName('')
+      setShowNewType(false)
+    }
+    setSavingType(false)
+  }
 
   const handleConfirm = async () => {
     if (!type) return setErr('Please select a component type.')
@@ -49,35 +62,20 @@ function CreateMaterialModal({
     setSaving(false)
   }
 
-  const TYPE_OPTIONS = [
-    { value: 'IC / Microcontroller', icon: '⚙️', desc: 'STM32, ESP32, MCUs, FPGAs' },
-    { value: 'Passive Component',    icon: '〰️', desc: 'Resistors, Capacitors, Inductors' },
-    { value: 'Sensor / Module',      icon: '📡', desc: 'GNSS, IMU, Barometer, Camera' },
-    { value: 'Connector / Cable',    icon: '🔌', desc: 'JST, USB, FPC, Pin headers' },
-    { value: 'Other',                icon: '📦', desc: 'Anything else' },
-  ]
-
   const inputStyle = {
     background  : 'var(--bg-input)',
     borderColor : 'var(--border-dim)',
     color       : 'var(--text-primary)',
   }
 
-  const fmt = (n: number) =>
-  new Intl.NumberFormat('en-US', {
-    style                : 'currency',
-    currency             : 'USD',
-    maximumFractionDigits: 2,
-  }).format(n)
-
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-12 px-4 pb-4 overflow-y-auto"
       style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
       onClick={e => { if (e.target === e.currentTarget) onCancel() }}
     >
       <div
-        className="w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden animate-fade-up"
+        className="w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden animate-fade-up mb-8"
         style={{ background: 'var(--bg-card)', borderColor: 'var(--accent-border)' }}
       >
         {/* Header */}
@@ -85,12 +83,10 @@ function CreateMaterialModal({
           className="relative px-6 pt-6 pb-5 border-b overflow-hidden"
           style={{ borderColor: 'var(--border-dim)' }}
         >
-          {/* Glow blob */}
           <div
             className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-20 pointer-events-none"
             style={{ background: 'var(--accent)' }}
           />
-
           <div className="flex items-start justify-between relative">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -116,11 +112,11 @@ function CreateMaterialModal({
               className="w-8 h-8 rounded-lg flex items-center justify-center border transition-all mt-1"
               style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}
               onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = 'var(--neon-pink)'
-                ;(e.currentTarget as HTMLElement).style.color = 'var(--neon-pink)'
+                ;(e.currentTarget as HTMLElement).style.borderColor = '#ef4444'
+                ;(e.currentTarget as HTMLElement).style.color = '#ef4444'
               }}
               onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-dim)'
+                ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-dim)'
                 ;(e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
               }}
             >
@@ -130,37 +126,79 @@ function CreateMaterialModal({
         </div>
 
         <div className="p-6 space-y-5">
-          {/* Type selector — visual cards */}
+
+          {/* Component type */}
           <div className="space-y-2">
-            <Label className="text-xs font-bold uppercase tracking-widest"
-              style={{ color: 'var(--text-secondary)' }}>
-              Component Type <span style={{ color: 'var(--neon-pink)' }}>*</span>
-            </Label>
-            <div className="grid grid-cols-1 gap-2">
-              {TYPE_OPTIONS.map(opt => {
-                const isSelected = type === opt.value
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-bold uppercase tracking-widest"
+                style={{ color: 'var(--text-secondary)' }}>
+                Component Type <span style={{ color: '#ef4444' }}>*</span>
+              </Label>
+              <button
+                onClick={() => { setShowNewType(v => !v); setNewTypeName('') }}
+                className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border transition-all"
+                style={{
+                  borderColor : 'var(--accent-border)',
+                  color       : 'var(--accent)',
+                  background  : 'var(--accent-soft)',
+                }}
+              >
+                <Plus className="w-3 h-3" />
+                {showNewType ? 'Cancel' : 'New Type'}
+              </button>
+            </div>
+
+            {/* Inline new type input */}
+            {showNewType && (
+              <div
+                className="flex items-center gap-2 p-3 rounded-xl border"
+                style={{ background: 'var(--bg-secondary)', borderColor: 'var(--accent-border)' }}
+              >
+                <Input
+                  placeholder="e.g. Power Module, Crystal Oscillator…"
+                  value={newTypeName}
+                  onChange={e => setNewTypeName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAddType() }}
+                  className="h-9 border rounded-lg text-sm flex-1"
+                  style={inputStyle}
+                  autoFocus
+                />
+                <button
+                  onClick={handleAddType}
+                  disabled={savingType || !newTypeName.trim()}
+                  className="h-9 px-4 rounded-lg text-sm font-semibold disabled:opacity-50 shrink-0 flex items-center gap-1.5"
+                  style={{ background: 'var(--accent)', color: '#fff' }}
+                >
+                  {savingType
+                    ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    : <Check className="w-3.5 h-3.5" />
+                  }
+                  {savingType ? '…' : 'Add'}
+                </button>
+              </div>
+            )}
+
+            {/* Type list — scrollable */}
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {types.map(opt => {
+                const isSelected = type === opt
                 return (
                   <button
-                    key={opt.value}
+                    key={opt}
                     type="button"
-                    onClick={() => { setType(opt.value); setErr('') }}
+                    onClick={() => { setType(opt); setErr('') }}
                     className="flex items-center gap-3 w-full px-4 py-3 rounded-xl border text-left transition-all duration-150"
                     style={{
                       background  : isSelected ? 'var(--accent-soft)' : 'var(--bg-secondary)',
                       borderColor : isSelected ? 'var(--accent)' : 'var(--border-dim)',
-                      transform   : isSelected ? 'scale(1.01)' : 'scale(1)',
                     }}
                   >
-                    <span className="text-xl w-7 text-center shrink-0">{opt.icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold"
-                        style={{ color: isSelected ? 'var(--accent)' : 'var(--text-primary)' }}>
-                        {opt.value}
-                      </p>
-                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>
-                        {opt.desc}
-                      </p>
-                    </div>
+                    <span
+                      className="text-sm font-semibold flex-1"
+                      style={{ color: isSelected ? 'var(--accent)' : 'var(--text-primary)' }}
+                    >
+                      {opt}
+                    </span>
                     {isSelected && (
                       <div
                         className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
@@ -175,7 +213,7 @@ function CreateMaterialModal({
             </div>
           </div>
 
-          {/* Part number / description */}
+          {/* Description */}
           <div className="space-y-2">
             <Label className="text-xs font-bold uppercase tracking-widest"
               style={{ color: 'var(--text-secondary)' }}>
@@ -196,7 +234,7 @@ function CreateMaterialModal({
 
           {err && (
             <p className="text-xs px-3 py-2.5 rounded-lg"
-              style={{ background: '#ff006e10', border: '1px solid #ff006e33', color: '#ff006e' }}>
+              style={{ background: '#ef444410', border: '1px solid #ef444430', color: '#ef4444' }}>
               ⚠ {err}
             </p>
           )}
@@ -235,12 +273,21 @@ function CreateMaterialModal({
   )
 }
 
+// ── Main InscanSection ─────────────────────────────────────────────────────
 export default function InscanSection({
   vendors   : initialVendors,
   materials : initialMaterials,
+  types     : initialTypes = [
+    'IC / Microcontroller',
+    'Passive Component',
+    'Sensor / Module',
+    'Connector / Cable',
+    'Other',
+  ],
 }: {
   vendors   : Vendor[]
   materials : Material[]
+  types    ?: string[]
 }) {
   const router = useRouter()
 
@@ -250,7 +297,7 @@ export default function InscanSection({
     Object.fromEntries(initialMaterials.map(m => [m.id, m.type]))
   )
 
-  // Modal state for creating new material
+  // Modal state
   const [pendingMaterialName, setPendingMaterialName] = useState<string | null>(null)
   const [pendingResolve,      setPendingResolve]      = useState<((opt: { id: string; label: string } | null) => void) | null>(null)
 
@@ -267,14 +314,12 @@ export default function InscanSection({
   const [error,        setError]        = useState<string | null>(null)
   const [success,      setSuccess]      = useState(false)
 
-  /* ── when user selects existing material, auto-fill type ── */
   const handleMaterialChange = (id: string) => {
     setSelMaterial(id)
     const type = materialTypeMap[id]
     if (type) setMaterialType(type)
   }
 
-  /* ── vendor create ── */
   const handleCreateVendor = async (name: string) => {
     const sb = createClient()
     const { data } = await sb.from('vendors').insert({ name }).select().single()
@@ -284,7 +329,6 @@ export default function InscanSection({
     return opt
   }
 
-  /* ── material create — opens modal, waits for user to fill type ── */
   const handleCreateMaterial = (name: string): Promise<{ id: string; label: string } | null> => {
     return new Promise(resolve => {
       setPendingMaterialName(name)
@@ -292,7 +336,6 @@ export default function InscanSection({
     })
   }
 
-  /* ── called when user confirms the modal ── */
   const handleModalConfirm = async (type: string, description: string) => {
     if (!pendingMaterialName || !pendingResolve) return
     const sb = createClient()
@@ -322,7 +365,6 @@ export default function InscanSection({
     setPendingResolve(null)
   }
 
-  /* ── submit inscan ── */
   const handleSubmit = async () => {
     setError(null); setSuccess(false)
     if (!selMaterial) return setError('Please select or create a material.')
@@ -365,23 +407,35 @@ export default function InscanSection({
       {pendingMaterialName && (
         <CreateMaterialModal
           name={pendingMaterialName}
+          initialTypes={initialTypes}
           onConfirm={handleModalConfirm}
           onCancel={handleModalCancel}
         />
       )}
 
-      <div className="rounded-2xl border overflow-hidden"
-        style={{ borderColor: 'var(--accent-border)', background: 'var(--bg-card)', boxShadow: '0 0 40px color-mix(in srgb, var(--accent) 5%, transparent)' }}>
-
+      <div
+        className="rounded-2xl border overflow-hidden"
+        style={{
+          borderColor : 'var(--accent-border)',
+          background  : 'var(--bg-card)',
+          boxShadow   : '0 0 40px color-mix(in srgb, var(--accent) 5%, transparent)',
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center gap-3 px-6 py-4 border-b"
-          style={{ borderColor: 'var(--border-dim)', background: 'var(--accent-soft)' }}>
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-            style={{ background: 'var(--accent-border)' }}>
+        <div
+          className="flex items-center gap-3 px-6 py-4 border-b"
+          style={{ borderColor: 'var(--border-dim)', background: 'var(--accent-soft)' }}
+        >
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center"
+            style={{ background: 'var(--accent-border)' }}
+          >
             <PackagePlus className="w-4 h-4" style={{ color: 'var(--accent)' }} />
           </div>
           <div>
-            <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Inscan Stock</p>
+            <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+              Inscan Stock
+            </p>
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
               Add incoming stock from a vendor
             </p>
@@ -407,18 +461,20 @@ export default function InscanSection({
               />
             </div>
 
-            {/* Type — read only if existing, select if new */}
+            {/* Type — read only, auto filled */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase tracking-wider"
                 style={{ color: 'var(--text-secondary)' }}>
                 Component Type
               </Label>
-              <div className="h-11 px-3 flex items-center rounded-lg border text-sm"
+              <div
+                className="h-11 px-3 flex items-center rounded-lg border text-sm"
                 style={{
                   background  : 'var(--bg-input)',
                   borderColor : 'var(--border-dim)',
                   color       : materialType ? 'var(--text-primary)' : 'var(--text-dim)',
-                }}>
+                }}
+              >
                 {materialType || 'Auto-filled from material'}
               </div>
             </div>
@@ -445,20 +501,26 @@ export default function InscanSection({
                 style={{ color: 'var(--text-secondary)' }}>
                 <Hash className="w-3 h-3" /> Quantity (Units)
               </Label>
-              <Input type="number" min={1} placeholder="e.g. 500"
+              <Input
+                type="number" min={1} placeholder="e.g. 500"
                 value={quantity} onChange={e => setQuantity(e.target.value)}
-                className="h-11 border rounded-lg text-sm" style={inputStyle} />
+                className="h-11 border rounded-lg text-sm"
+                style={inputStyle}
+              />
             </div>
 
             {/* Unit cost */}
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider"
                 style={{ color: 'var(--text-secondary)' }}>
-                <DollarSign className="w-3 h-3" /> Unit Cost (₹) — optional
+                <DollarSign className="w-3 h-3" /> Unit Cost (USD) — optional
               </Label>
-              <Input type="number" min={0} placeholder="e.g. 85"
+              <Input
+                type="number" min={0} placeholder="e.g. 1.85"
                 value={unitCost} onChange={e => setUnitCost(e.target.value)}
-                className="h-11 border rounded-lg text-sm" style={inputStyle} />
+                className="h-11 border rounded-lg text-sm"
+                style={inputStyle}
+              />
             </div>
 
             {/* Received date */}
@@ -469,16 +531,23 @@ export default function InscanSection({
               </Label>
               <Popover open={calOpen} onOpenChange={setCalOpen}>
                 <PopoverTrigger asChild>
-                  <button className="flex items-center gap-2 w-full h-11 px-3 border rounded-lg text-sm"
-                    style={inputStyle}>
+                  <button
+                    className="flex items-center gap-2 w-full h-11 px-3 border rounded-lg text-sm"
+                    style={inputStyle}
+                  >
                     <CalendarIcon className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
                     {format(receivedAt, 'dd MMM yyyy')}
                   </button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0"
-                  style={{ background: 'var(--bg-card)', borderColor: 'var(--border-dim)' }}>
-                  <Calendar mode="single" selected={receivedAt}
-                    onSelect={d => { if (d) { setReceivedAt(d); setCalOpen(false) } }} initialFocus />
+                <PopoverContent
+                  className="w-auto p-0"
+                  style={{ background: 'var(--bg-card)', borderColor: 'var(--border-dim)' }}
+                >
+                  <Calendar
+                    mode="single" selected={receivedAt}
+                    onSelect={d => { if (d) { setReceivedAt(d); setCalOpen(false) } }}
+                    initialFocus
+                  />
                 </PopoverContent>
               </Popover>
             </div>
@@ -489,9 +558,12 @@ export default function InscanSection({
                 style={{ color: 'var(--text-secondary)' }}>
                 <FileText className="w-3 h-3" /> Notes — optional
               </Label>
-              <Input placeholder="e.g. Batch A, urgent restock, invoice #1234"
+              <Input
+                placeholder="e.g. Batch A, urgent restock, invoice #1234"
                 value={notes} onChange={e => setNotes(e.target.value)}
-                className="h-11 border rounded-lg text-sm" style={inputStyle} />
+                className="h-11 border rounded-lg text-sm"
+                style={inputStyle}
+              />
             </div>
           </div>
 
@@ -499,28 +571,40 @@ export default function InscanSection({
 
           {error && (
             <div className="mt-4 px-4 py-3 rounded-lg text-sm"
-              style={{ background: '#ff006e10', border: '1px solid #ff006e33', color: '#ff006e' }}>
+              style={{ background: '#ef444410', border: '1px solid #ef444430', color: '#ef4444' }}>
               ⚠ {error}
             </div>
           )}
           {success && (
             <div className="mt-4 px-4 py-3 rounded-lg text-sm"
-              style={{ background: 'color-mix(in srgb, var(--neon-green) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--neon-green) 25%, transparent)', color: 'var(--neon-green)' }}>
+              style={{
+                background : 'color-mix(in srgb, var(--neon-green) 10%, transparent)',
+                border     : '1px solid color-mix(in srgb, var(--neon-green) 25%, transparent)',
+                color      : 'var(--neon-green)',
+              }}>
               ✓ Stock inscanned successfully!
             </div>
           )}
 
           <div className="mt-4 flex items-center gap-3">
-            <button onClick={handleSubmit} disabled={submitting}
+            <button
+              onClick={handleSubmit}
+              disabled={submitting}
               className="px-6 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50"
-              style={{ background: 'var(--accent)', color: '#000' }}>
+              style={{ background: 'var(--accent)', color: '#fff' }}
+            >
               {submitting ? 'Saving…' : '+ Inscan Stock'}
             </button>
             {(selMaterial || selVendor || quantity) && (
               <button
-                onClick={() => { setSelMaterial(''); setSelVendor(''); setQuantity(''); setUnitCost(''); setNotes(''); setMaterialType('') }}
+                onClick={() => {
+                  setSelMaterial(''); setSelVendor('')
+                  setQuantity(''); setUnitCost('')
+                  setNotes(''); setMaterialType('')
+                }}
                 className="px-4 py-2.5 rounded-lg text-sm font-medium border"
-                style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
+                style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}
+              >
                 Clear
               </button>
             )}

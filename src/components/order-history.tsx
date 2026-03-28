@@ -22,13 +22,13 @@ import type { GroupedOrder, Company, Product } from '@/lib/types'
 const PAGE_SIZE = 10
 
 export default function OrderHistory({
-  orders,
-  companies,
-  products,
+  orders    = [],
+  companies = [],
+  products  = [],
 }: {
-  orders   : GroupedOrder[]
-  companies: Company[]
-  products : Product[]
+  orders   ?: GroupedOrder[]
+  companies?: Company[]
+  products ?: Product[]
 }) {
   const router = useRouter()
 

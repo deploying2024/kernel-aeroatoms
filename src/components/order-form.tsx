@@ -9,17 +9,17 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { format } from 'date-fns'
 import {
-  CalendarIcon, Plus, Trash2, Building2,
-  Package, Hash, DollarSign, Receipt,
+  CalendarIcon, Plus, Trash2,
+  Building2, Package, Receipt,
 } from 'lucide-react'
 import CreatableCombobox from '@/components/creatable-combobox'
 import type { Company, Product } from '@/lib/types'
 
 type LineItem = {
-  id           : string
-  product_id   : string
-  product_name : string
-  quantity     : string
+  id            : string
+  product_id    : string
+  product_name  : string
+  quantity      : string
   price_per_unit: string
 }
 
@@ -32,11 +32,11 @@ const emptyLine = (): LineItem => ({
 })
 
 export default function OrderForm({
-  companies: initialCompanies,
-  products : initialProducts,
+  companies: initialCompanies = [],
+  products : initialProducts  = [],
 }: {
-  companies: Company[]
-  products : Product[]
+  companies?: Company[]
+  products ?: Product[]
 }) {
   const router = useRouter()
 
@@ -112,15 +112,20 @@ export default function OrderForm({
       price_per_unit: parseFloat(l.price_per_unit),
     }))
 
-    if (parsedLines.some(l => isNaN(l.quantity) || l.quantity <= 0 || isNaN(l.price_per_unit) || l.price_per_unit <= 0))
-      return setError('Quantity and price must be positive numbers.')
+    if (parsedLines.some(l =>
+      isNaN(l.quantity) || l.quantity <= 0 ||
+      isNaN(l.price_per_unit) || l.price_per_unit <= 0
+    )) return setError('Quantity and price must be positive numbers.')
 
     setSubmitting(true)
     const sb = createClient()
 
     const { data: order, error: oErr } = await sb
       .from('orders')
-      .insert({ company_id: selCompany, order_date: format(orderDate, 'yyyy-MM-dd') })
+      .insert({
+        company_id : selCompany,
+        order_date : format(orderDate, 'yyyy-MM-dd'),
+      })
       .select().single()
 
     if (oErr || !order) {
@@ -147,17 +152,17 @@ export default function OrderForm({
   }
 
   const orderTotal = lines.reduce((sum, l) => {
-    const q = parseInt(l.quantity  || '0')
+    const q = parseInt(l.quantity   || '0')
     const p = parseFloat(l.price_per_unit || '0')
     return sum + (isNaN(q) || isNaN(p) ? 0 : q * p)
   }, 0)
 
   const fmt = (n: number) =>
-  new Intl.NumberFormat('en-IN', {
-    style                : 'currency',
-    currency             : 'INR',
-    maximumFractionDigits: 0,
-  }).format(n)
+    new Intl.NumberFormat('en-IN', {
+      style                : 'currency',
+      currency             : 'INR',
+      maximumFractionDigits: 0,
+    }).format(n)
 
   const inputStyle = {
     background  : 'var(--bg-input)',
@@ -169,8 +174,8 @@ export default function OrderForm({
     <div
       className="rounded-2xl border overflow-hidden"
       style={{
-        borderColor : 'var(--accent-border)',
         background  : 'var(--bg-card)',
+        borderColor : 'var(--accent-border)',
         boxShadow   : '0 0 40px color-mix(in srgb, var(--accent) 5%, transparent)',
       }}
     >
@@ -179,19 +184,25 @@ export default function OrderForm({
         className="flex items-center gap-3 px-6 py-4 border-b"
         style={{ borderColor: 'var(--border-dim)', background: 'var(--accent-soft)' }}
       >
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-          style={{ background: 'var(--accent-border)' }}>
+        <div
+          className="w-7 h-7 rounded-lg flex items-center justify-center"
+          style={{ background: 'var(--accent-border)' }}
+        >
           <Plus className="w-4 h-4" style={{ color: 'var(--accent)' }} />
         </div>
         <div>
-          <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>New Order</p>
+          <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+            New Order
+          </p>
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
             One order can have multiple products
           </p>
         </div>
         {orderTotal > 0 && (
-          <div className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-full"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--accent-border)' }}>
+          <div
+            className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-full"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--accent-border)' }}
+          >
             <Receipt className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
             <span className="text-sm font-bold" style={{ color: 'var(--accent)' }}>
               {fmt(orderTotal)}
@@ -201,11 +212,14 @@ export default function OrderForm({
       </div>
 
       <div className="p-6 space-y-6">
+
         {/* Company + Date row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div className="space-y-2">
-            <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider"
-              style={{ color: 'var(--text-secondary)' }}>
+            <Label
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider"
+              style={{ color: 'var(--text-secondary)' }}
+            >
               <Building2 className="w-3 h-3" /> Company
             </Label>
             <CreatableCombobox
@@ -219,23 +233,33 @@ export default function OrderForm({
           </div>
 
           <div className="space-y-2">
-            <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider"
-              style={{ color: 'var(--text-secondary)' }}>
+            <Label
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider"
+              style={{ color: 'var(--text-secondary)' }}
+            >
               <CalendarIcon className="w-3 h-3" /> Order Date
             </Label>
             <Popover open={calOpen} onOpenChange={setCalOpen}>
               <PopoverTrigger asChild>
-                <button className="flex items-center gap-2 w-full h-11 px-3 border rounded-lg text-sm text-left"
-                  style={inputStyle}>
-                  <CalendarIcon className="w-4 h-4 shrink-0" style={{ color: 'var(--text-secondary)' }} />
+                <button
+                  className="flex items-center gap-2 w-full h-11 px-3 border rounded-lg text-sm text-left"
+                  style={inputStyle}
+                >
+                  <CalendarIcon className="w-4 h-4 shrink-0"
+                    style={{ color: 'var(--text-secondary)' }} />
                   {format(orderDate, 'dd MMM yyyy')}
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0"
-                style={{ background: 'var(--bg-card)', borderColor: 'var(--border-dim)' }}>
-                <Calendar mode="single" selected={orderDate}
+              <PopoverContent
+                className="w-auto p-0"
+                style={{ background: 'var(--bg-card)', borderColor: 'var(--border-dim)' }}
+              >
+                <Calendar
+                  mode="single"
+                  selected={orderDate}
                   onSelect={d => { if (d) { setOrderDate(d); setCalOpen(false) } }}
-                  initialFocus />
+                  initialFocus
+                />
               </PopoverContent>
             </Popover>
           </div>
@@ -244,12 +268,20 @@ export default function OrderForm({
         {/* Line items */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider"
-              style={{ color: 'var(--text-secondary)' }}>
+            <Label
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider"
+              style={{ color: 'var(--text-secondary)' }}
+            >
               <Package className="w-3 h-3" /> Products
             </Label>
-            <span className="text-xs px-2 py-0.5 rounded-full"
-              style={{ background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-border)' }}>
+            <span
+              className="text-xs px-2 py-0.5 rounded-full"
+              style={{
+                background : 'var(--accent-soft)',
+                color      : 'var(--accent)',
+                border     : '1px solid var(--accent-border)',
+              }}
+            >
               {lines.length} line{lines.length !== 1 && 's'}
             </span>
           </div>
@@ -257,24 +289,31 @@ export default function OrderForm({
           {/* Column headers */}
           <div className="hidden sm:grid grid-cols-12 gap-2 px-1">
             {['Product', 'Qty', 'Price / Unit', 'Line Total', ''].map((h, i) => (
-              <div key={i}
+              <div
+                key={i}
                 className={`text-[10px] font-bold uppercase tracking-wider ${
-                  i === 0 ? 'col-span-5' : i === 1 ? 'col-span-2' : i === 2 ? 'col-span-2' : i === 3 ? 'col-span-2' : 'col-span-1'
+                  i === 0 ? 'col-span-5' :
+                  i === 1 ? 'col-span-2' :
+                  i === 2 ? 'col-span-2' :
+                  i === 3 ? 'col-span-2' : 'col-span-1'
                 }`}
-                style={{ color: 'var(--text-dim)' }}>
+                style={{ color: 'var(--text-dim)' }}
+              >
                 {h}
               </div>
             ))}
           </div>
 
-          {lines.map((line, idx) => {
-            const lineTotal = (parseInt(line.quantity || '0') || 0) *
+          {lines.map(line => {
+            const lineTotal =
+              (parseInt(line.quantity      || '0') || 0) *
               (parseFloat(line.price_per_unit || '0') || 0)
             return (
-              <div key={line.id}
+              <div
+                key={line.id}
                 className="grid grid-cols-12 gap-2 items-center p-3 rounded-xl border"
-                style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-dim)' }}>
-
+                style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-dim)' }}
+              >
                 {/* Product */}
                 <div className="col-span-12 sm:col-span-5">
                   <CreatableCombobox
@@ -289,38 +328,46 @@ export default function OrderForm({
 
                 {/* Qty */}
                 <div className="col-span-5 sm:col-span-2">
-                  <Input type="number" min={1} placeholder="Qty"
+                  <Input
+                    type="number" min={1} placeholder="Qty"
                     value={line.quantity}
                     onChange={e => updateLine(line.id, { quantity: e.target.value })}
                     className="h-11 border rounded-lg text-sm"
-                    style={inputStyle} />
+                    style={inputStyle}
+                  />
                 </div>
 
                 {/* Price */}
                 <div className="col-span-5 sm:col-span-2">
-                  <Input type="number" min={0} placeholder="₹ Price"
+                  <Input
+                    type="number" min={0} placeholder="₹ Price"
                     value={line.price_per_unit}
                     onChange={e => updateLine(line.id, { price_per_unit: e.target.value })}
                     className="h-11 border rounded-lg text-sm"
-                    style={inputStyle} />
+                    style={inputStyle}
+                  />
                 </div>
 
                 {/* Line total */}
-                <div className="col-span-10 sm:col-span-2 flex items-center h-11 px-3 rounded-lg border text-sm font-bold"
+                <div
+                  className="col-span-10 sm:col-span-2 flex items-center h-11 px-3 rounded-lg border text-sm font-bold"
                   style={{
                     background  : lineTotal > 0 ? 'var(--accent-soft)' : 'var(--bg-input)',
                     borderColor : lineTotal > 0 ? 'var(--accent-border)' : 'var(--border-dim)',
                     color       : lineTotal > 0 ? 'var(--accent)' : 'var(--text-dim)',
-                  }}>
+                  }}
+                >
                   {lineTotal > 0 ? fmt(lineTotal) : '—'}
                 </div>
 
                 {/* Remove */}
                 <div className="col-span-2 sm:col-span-1 flex justify-end">
-                  <button onClick={() => removeLine(line.id)}
+                  <button
+                    onClick={() => removeLine(line.id)}
                     disabled={lines.length === 1}
                     className="w-9 h-9 rounded-lg flex items-center justify-center border transition-all disabled:opacity-30"
-                    style={{ borderColor: 'var(--border-dim)', color: 'var(--neon-pink)' }}>
+                    style={{ borderColor: 'var(--border-dim)', color: 'var(--neon-pink)' }}
+                  >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -337,7 +384,8 @@ export default function OrderForm({
               color       : 'var(--accent)',
               background  : 'var(--accent-soft)',
               borderStyle : 'dashed',
-            }}>
+            }}
+          >
             <Plus className="w-3.5 h-3.5" /> Add Product Line
           </button>
         </div>
@@ -347,34 +395,46 @@ export default function OrderForm({
 
         {/* Messages */}
         {error && (
-          <div className="flex items-center gap-2 px-4 py-3 rounded-lg text-sm"
-            style={{ background: '#ff006e10', border: '1px solid #ff006e33', color: '#ff006e' }}>
+          <div
+            className="flex items-center gap-2 px-4 py-3 rounded-lg text-sm"
+            style={{ background: '#ff006e10', border: '1px solid #ff006e33', color: '#ff006e' }}
+          >
             ⚠ {error}
           </div>
         )}
         {success && (
-          <div className="flex items-center gap-2 px-4 py-3 rounded-lg text-sm"
+          <div
+            className="flex items-center gap-2 px-4 py-3 rounded-lg text-sm"
             style={{
               background : 'color-mix(in srgb, var(--neon-green) 10%, transparent)',
               border     : '1px solid color-mix(in srgb, var(--neon-green) 25%, transparent)',
               color      : 'var(--neon-green)',
-            }}>
+            }}
+          >
             ✓ Order created successfully!
           </div>
         )}
 
         {/* Actions */}
         <div className="flex items-center gap-3">
-          <button onClick={handleSubmit} disabled={submitting}
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
             className="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-50"
-            style={{ background: 'var(--accent)', color: '#000' }}>
+            style={{ background: 'var(--accent)', color: '#fff' }}
+          >
             {submitting ? 'Creating…' : '+ Create Order'}
           </button>
           {(selCompany || lines.some(l => l.product_id)) && (
             <button
-              onClick={() => { setSelCompany(''); setLines([emptyLine()]); setOrderDate(new Date()) }}
+              onClick={() => {
+                setSelCompany('')
+                setLines([emptyLine()])
+                setOrderDate(new Date())
+              }}
               className="px-4 py-2.5 rounded-lg text-sm font-medium border transition-all"
-              style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
+              style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}
+            >
               Clear
             </button>
           )}
