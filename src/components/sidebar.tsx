@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, ShoppingCart, PackageSearch,
-  BarChart3, Gauge, LogOut, Plane,
+  BarChart3, Gauge, Truck, LogOut, Plane,
   ChevronLeft, ChevronRight, Menu, X,
   Sun, Moon,
 } from 'lucide-react'
@@ -15,11 +15,12 @@ import { useTheme } from 'next-themes'
 import Image from 'next/image'
 
 const navItems = [
-  { label: 'Dashboard',       href: '/dashboard',      icon: LayoutDashboard },
-  { label: 'Orders',          href: '/orders',          icon: ShoppingCart    },
-  { label: 'Inventory',       href: '/inventory',       icon: PackageSearch   },
-  { label: 'Inventory Value', href: '/inventory-value', icon: BarChart3       },
-  { label: 'Yield Rate',      href: '/yield-rate',      icon: Gauge           },
+  { label: 'Dashboard',       href: '/dashboard',        icon: LayoutDashboard },
+  { label: 'Orders',          href: '/orders',            icon: ShoppingCart    },
+  { label: 'Inventory',       href: '/inventory',         icon: PackageSearch   },
+  { label: 'Inventory Value', href: '/inventory-value',   icon: BarChart3       },
+  { label: 'Yield Rate',      href: '/yield-rate',        icon: Gauge           },
+  { label: 'Shipping',        href: '/shipping',          icon: Truck           },
 ]
 
 // ── Extracted outside to avoid "component created during render" error ──

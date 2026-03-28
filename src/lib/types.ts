@@ -102,3 +102,15 @@ export type PcbDefect = {
   reason   : string
   count    : number
 }
+export type ShippingLabel = {
+  id                : string
+  recipient_name    : string
+  recipient_company : string | null
+  recipient_address : string
+  recipient_city    : string
+  recipient_pincode : string
+  recipient_phone   : string
+  notes             : string | null
+  created_at        : string
+  updated_at        : string
+}

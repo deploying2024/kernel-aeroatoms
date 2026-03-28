@@ -26,20 +26,43 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user }, error } = await supabase.auth.getUser()
 
-  if (pathname.startsWith('/login')) {
-    if (user && !error) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
-    return supabaseResponse
+  const isAuthenticated = !!user && !error
+
+  // ── Security headers (applied to all responses) ──
+  const securityHeaders: Record<string, string> = {
+    'X-Frame-Options'           : 'DENY',
+    'X-Content-Type-Options'    : 'nosniff',
+    'Referrer-Policy'           : 'strict-origin-when-cross-origin',
+    'Permissions-Policy'        : 'camera=(), microphone=(), geolocation=()',
+    'X-XSS-Protection'          : '1; mode=block',
+    'Strict-Transport-Security' : 'max-age=31536000; includeSubDomains',
   }
 
-  if (!user || error) {
+  // ── Login route ──
+  if (pathname.startsWith('/login')) {
+    const res = isAuthenticated
+      ? NextResponse.redirect(new URL('/dashboard', request.url))
+      : supabaseResponse
+
+    Object.entries(securityHeaders).forEach(([k, v]) => res.headers.set(k, v))
+    return res
+  }
+
+  // ── Protected routes ──
+  if (!isAuthenticated) {
     const res = NextResponse.redirect(new URL('/login', request.url))
+    // Clear stale auth cookies
     request.cookies.getAll().forEach(({ name }) => {
       if (name.startsWith('sb-')) res.cookies.delete(name)
     })
+    Object.entries(securityHeaders).forEach(([k, v]) => res.headers.set(k, v))
     return res
   }
+
+  // ── Authenticated — apply headers and continue ──
+  Object.entries(securityHeaders).forEach(([k, v]) =>
+    supabaseResponse.headers.set(k, v)
+  )
 
   return supabaseResponse
 }
