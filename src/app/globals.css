@@ -67,11 +67,11 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: var(--accent-border); }
 
 /* ── Glow — subtle in dark, shadow in light ── */
-:root .glow-blue   { box-shadow: 0 0 0 1px #3b82f622, 0 4px 24px #3b82f618; }
-:root .glow-purple { box-shadow: 0 0 0 1px #8b5cf622, 0 4px 24px #8b5cf618; }
-:root .glow-green  { box-shadow: 0 0 0 1px #10b98122, 0 4px 24px #10b98118; }
-:root .glow-pink   { box-shadow: 0 0 0 1px #ef444422, 0 4px 24px #ef444418; }
-
+/* ── Glow — dark mode ── */
+:root .glow-blue   { box-shadow: 0 0 0 1px #3b82f622, 0 8px 32px #3b82f628, 0 32px 64px #3b82f610; }
+:root .glow-purple { box-shadow: 0 0 0 1px #8b5cf622, 0 8px 32px #8b5cf628, 0 32px 64px #8b5cf610; }
+:root .glow-green  { box-shadow: 0 0 0 1px #10b98122, 0 8px 32px #10b98128, 0 32px 64px #10b98110; }
+:root .glow-pink   { box-shadow: 0 0 0 1px #ef444422, 0 8px 32px #ef444428, 0 32px 64px #ef444410; }
 .light .glow-blue,
 .light .glow-purple,
 .light .glow-green,
