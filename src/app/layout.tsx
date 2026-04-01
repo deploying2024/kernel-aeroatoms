@@ -17,17 +17,17 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable       : true,
-    statusBarStyle: 'black-translucent',
+    statusBarStyle : 'black-translucent',
     title         : 'Kernel',
   },
 }
 
 export const viewport: Viewport = {
-  themeColor           : '#3b82f6',
-  width                : 'device-width',
-  initialScale         : 1,
-  minimumScale         : 1,
-  viewportFit          : 'cover',
+  themeColor  : '#0a0a0a',
+  width       : 'device-width',
+  initialScale: 1,
+  minimumScale: 1,
+  viewportFit : 'cover',
 }
 
 export default function RootLayout({
@@ -46,6 +46,17 @@ export default function RootLayout({
         >
           {children}
         </ThemeProvider>
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js')
+                  .then(function(reg) { console.log('SW registered'); })
+                  .catch(function(err) { console.log('SW failed:', err); });
+              });
+            }
+          `
+        }} />
       </body>
     </html>
   )

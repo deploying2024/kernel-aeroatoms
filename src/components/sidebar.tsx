@@ -5,10 +5,10 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import {
-  LayoutDashboard, ShoppingCart, PackageSearch,
-  BarChart3, Gauge, Truck, LogOut, Plane,
-  ChevronLeft, ChevronRight, Menu, X,
-  Sun, Moon,
+  LayoutDashboard, ShoppingCart, PackagePlus,
+  PackageMinus, BarChart3, Gauge, Truck,
+  LogOut, Plane, ChevronLeft, ChevronRight,
+  Menu, X, Sun, Moon,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTheme } from 'next-themes'
@@ -17,7 +17,8 @@ import Image from 'next/image'
 const navItems = [
   { label: 'Dashboard',       href: '/dashboard',        icon: LayoutDashboard },
   { label: 'Orders',          href: '/orders',            icon: ShoppingCart    },
-  { label: 'Inventory',       href: '/inventory',         icon: PackageSearch   },
+  { label: 'Inscan',          href: '/inscan',            icon: PackagePlus     },
+  { label: 'Outscan',         href: '/outscan',           icon: PackageMinus    },
   { label: 'Inventory Value', href: '/inventory-value',   icon: BarChart3       },
   { label: 'Yield Rate',      href: '/yield-rate',        icon: Gauge           },
   { label: 'Shipping',        href: '/shipping',          icon: Truck           },

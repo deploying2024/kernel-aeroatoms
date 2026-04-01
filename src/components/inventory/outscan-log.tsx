@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { format, parseISO } from 'date-fns'
 import {
   ClipboardList, ChevronLeft, ChevronRight,
-  PackageMinus, Pencil, Trash2, X, Check,
+  PackageMinus, Pencil, Trash2, X, Check, CalendarIcon,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -75,10 +75,10 @@ export default function OutscanLog({ logs = [] }: { logs?: OutscanLogType[] }) {
 
   return (
     <>
-      {/* Edit Modal */}
+      {/* ── Edit Modal ── */}
       {editing && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
           style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
           onClick={e => { if (e.target === e.currentTarget) setEditing(null) }}
         >
@@ -86,7 +86,6 @@ export default function OutscanLog({ logs = [] }: { logs?: OutscanLogType[] }) {
             className="w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden animate-fade-up"
             style={{ background: 'var(--bg-card)', borderColor: '#ef444430' }}
           >
-            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b"
               style={{ borderColor: 'var(--border-dim)', background: '#ef444408' }}>
               <div>
@@ -109,26 +108,20 @@ export default function OutscanLog({ logs = [] }: { logs?: OutscanLogType[] }) {
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wider"
                   style={{ color: 'var(--text-secondary)' }}>Quantity Taken</Label>
-                <Input
-                  type="number" min={1}
+                <Input type="number" min={1}
                   value={editing.quantity_taken}
                   onChange={e => setEditing(p => p && ({ ...p, quantity_taken: e.target.value }))}
-                  className="h-11 border rounded-lg text-sm"
-                  style={inputStyle}
-                />
+                  className="h-11 border rounded-lg text-sm" style={inputStyle} />
               </div>
 
               {/* Reason */}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wider"
                   style={{ color: 'var(--text-secondary)' }}>Reason</Label>
-                <Input
-                  placeholder="e.g. Production batch #3"
+                <Input placeholder="e.g. Production batch #3"
                   value={editing.reason}
                   onChange={e => setEditing(p => p && ({ ...p, reason: e.target.value }))}
-                  className="h-11 border rounded-lg text-sm"
-                  style={inputStyle}
-                />
+                  className="h-11 border rounded-lg text-sm" style={inputStyle} />
               </div>
 
               {/* Date */}
@@ -139,6 +132,7 @@ export default function OutscanLog({ logs = [] }: { logs?: OutscanLogType[] }) {
                   <PopoverTrigger asChild>
                     <button className="flex items-center gap-2 w-full h-11 px-3 border rounded-lg text-sm"
                       style={inputStyle}>
+                      <CalendarIcon className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
                       {format(editing.taken_at, 'dd MMM yyyy')}
                     </button>
                   </PopoverTrigger>
@@ -207,8 +201,7 @@ export default function OutscanLog({ logs = [] }: { logs?: OutscanLogType[] }) {
                     </td>
                   </tr>
                 ) : paginated.map(log => (
-                  <tr key={log.id}
-                    className="transition-colors"
+                  <tr key={log.id} className="transition-colors"
                     style={{ borderBottom: '1px solid var(--border-dim)' }}
                     onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-card-hover)'}
                     onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
@@ -234,12 +227,9 @@ export default function OutscanLog({ logs = [] }: { logs?: OutscanLogType[] }) {
                       {log.reason ?? <span style={{ color: 'var(--text-dim)' }}>—</span>}
                     </td>
 
-                    {/* Actions */}
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-1.5 justify-end">
-                        {/* Edit */}
-                        <button
-                          onClick={() => handleEdit(log)}
+                        <button onClick={() => handleEdit(log)}
                           className="w-7 h-7 rounded-lg flex items-center justify-center border transition-all"
                           style={{ borderColor: 'var(--border-dim)', color: 'var(--text-dim)' }}
                           onMouseEnter={e => {
@@ -249,31 +239,25 @@ export default function OutscanLog({ logs = [] }: { logs?: OutscanLogType[] }) {
                           onMouseLeave={e => {
                             ;(e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'
                             ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-dim)'
-                          }}
-                        >
+                          }}>
                           <Pencil className="w-3 h-3" />
                         </button>
 
-                        {/* Delete */}
                         {confirmDel === log.id ? (
                           <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleDelete(log.id)}
-                              disabled={deleting}
+                            <button onClick={() => handleDelete(log.id)} disabled={deleting}
                               className="px-2 py-1 rounded text-xs font-semibold"
                               style={{ background: '#ef4444', color: '#fff' }}>
                               {deleting ? '…' : 'Yes'}
                             </button>
-                            <button
-                              onClick={() => setConfirmDel(null)}
+                            <button onClick={() => setConfirmDel(null)}
                               className="px-2 py-1 rounded text-xs border"
                               style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
                               No
                             </button>
                           </div>
                         ) : (
-                          <button
-                            onClick={() => setConfirmDel(log.id)}
+                          <button onClick={() => setConfirmDel(log.id)}
                             className="w-7 h-7 rounded-lg flex items-center justify-center border transition-all"
                             style={{ borderColor: 'var(--border-dim)', color: 'var(--text-dim)' }}
                             onMouseEnter={e => {
@@ -283,8 +267,7 @@ export default function OutscanLog({ logs = [] }: { logs?: OutscanLogType[] }) {
                             onMouseLeave={e => {
                               ;(e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'
                               ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-dim)'
-                            }}
-                          >
+                            }}>
                             <Trash2 className="w-3 h-3" />
                           </button>
                         )}
@@ -297,7 +280,6 @@ export default function OutscanLog({ logs = [] }: { logs?: OutscanLogType[] }) {
           </div>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between pt-1">
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>

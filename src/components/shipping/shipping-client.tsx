@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { format } from 'date-fns'
 import {
-  Plus, Truck, Printer, Pencil,
+  Plus, Printer, Pencil,
   Trash2, X, Check, FileText,
   Building2, Phone, MapPin,
   ChevronLeft, ChevronRight,
@@ -54,16 +54,16 @@ export default function ShippingClient({
   const router = useRouter()
   const [, startTransition] = useTransition()
 
-  const [form,        setForm]        = useState<FormData>(emptyForm())
-  const [submitting,  setSubmitting]  = useState(false)
-  const [error,       setError]       = useState<string | null>(null)
-  const [success,     setSuccess]     = useState(false)
-  const [editLabel,   setEditLabel]   = useState<ShippingLabel | null>(null)
-  const [editForm,    setEditForm]    = useState<FormData>(emptyForm())
-  const [saving,      setSaving]      = useState(false)
-  const [confirmDel,  setConfirmDel]  = useState<string | null>(null)
-  const [deleting,    setDeleting]    = useState(false)
-  const [page,        setPage]        = useState(1)
+  const [form,       setForm]       = useState<FormData>(emptyForm())
+  const [submitting, setSubmitting] = useState(false)
+  const [error,      setError]      = useState<string | null>(null)
+  const [success,    setSuccess]    = useState(false)
+  const [editLabel,  setEditLabel]  = useState<ShippingLabel | null>(null)
+  const [editForm,   setEditForm]   = useState<FormData>(emptyForm())
+  const [saving,     setSaving]     = useState(false)
+  const [confirmDel, setConfirmDel] = useState<string | null>(null)
+  const [deleting,   setDeleting]   = useState(false)
+  const [page,       setPage]       = useState(1)
 
   const totalPages = Math.max(1, Math.ceil(labels.length / PAGE_SIZE))
   const paginated  = labels.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -80,12 +80,10 @@ export default function ShippingClient({
     return null
   }
 
-  // ── Create ──
   const handleSubmit = async () => {
     const err = validate(form)
     if (err) return setError(err)
     setError(null); setSubmitting(true)
-
     const sb = createClient()
     const { error: dbErr } = await sb.from('shipping_labels').insert({
       recipient_name    : form.recipient_name.trim(),
@@ -94,22 +92,14 @@ export default function ShippingClient({
       recipient_city    : form.recipient_city.trim(),
       recipient_pincode : form.recipient_pincode.trim(),
       recipient_phone   : form.recipient_phone.trim(),
-      notes             : form.notes.trim() || null,
+      notes             : form.notes.trim() || 'Electronic Device',
     })
-
-    if (dbErr) {
-      setError('Failed: ' + dbErr.message)
-      return setSubmitting(false)
-    }
-
-    setForm(emptyForm())
-    setSuccess(true)
-    setSubmitting(false)
+    if (dbErr) { setError('Failed: ' + dbErr.message); return setSubmitting(false) }
+    setForm(emptyForm()); setSuccess(true); setSubmitting(false)
     startTransition(() => router.refresh())
     setTimeout(() => setSuccess(false), 3000)
   }
 
-  // ── Edit ──
   const openEdit = (label: ShippingLabel) => {
     setEditLabel(label)
     setEditForm({
@@ -119,7 +109,7 @@ export default function ShippingClient({
       recipient_city    : label.recipient_city,
       recipient_pincode : label.recipient_pincode,
       recipient_phone   : label.recipient_phone,
-      notes             : label.notes ?? '',
+      notes             : label.notes ?? 'Electronic Device',
     })
   }
 
@@ -128,7 +118,6 @@ export default function ShippingClient({
     const err = validate(editForm)
     if (err) return setError(err)
     setSaving(true)
-
     const sb = createClient()
     await sb.from('shipping_labels').update({
       recipient_name    : editForm.recipient_name.trim(),
@@ -140,29 +129,22 @@ export default function ShippingClient({
       notes             : editForm.notes.trim() || null,
       updated_at        : new Date().toISOString(),
     }).eq('id', editLabel.id)
-
-    setSaving(false)
-    setEditLabel(null)
+    setSaving(false); setEditLabel(null)
     startTransition(() => router.refresh())
   }
 
-  // ── Delete ──
   const handleDelete = async (id: string) => {
     setDeleting(true)
     const sb = createClient()
     await sb.from('shipping_labels').delete().eq('id', id)
-    setDeleting(false)
-    setConfirmDel(null)
+    setDeleting(false); setConfirmDel(null)
     startTransition(() => router.refresh())
   }
 
-  // ── Print PDF ──
   const handlePrint = (label: ShippingLabel) => {
     const win = window.open('', '_blank')
     if (!win) return
-
-    const html = generateLabelHTML(label, sender)
-    win.document.write(html)
+    win.document.write(generateLabelHTML(label, sender))
     win.document.close()
     win.focus()
     setTimeout(() => win.print(), 500)
@@ -176,7 +158,7 @@ export default function ShippingClient({
 
   return (
     <>
-      {/* ── Edit Modal ── */}
+      {/* Edit Modal */}
       {editLabel && (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center pt-12 px-4 overflow-y-auto"
@@ -198,7 +180,6 @@ export default function ShippingClient({
                 <X className="w-4 h-4" />
               </button>
             </div>
-
             <div className="p-6 space-y-4">
               <FormFields
                 form={editForm}
@@ -226,7 +207,7 @@ export default function ShippingClient({
 
       <div className="px-6 md:px-10 py-8 space-y-10">
 
-        {/* ── Sender preview ── */}
+        {/* Sender preview */}
         <div
           className="rounded-2xl border p-5 flex items-start gap-4"
           style={{
@@ -235,31 +216,21 @@ export default function ShippingClient({
             boxShadow   : '0 0 0 1px #3b82f615, 0 8px 32px #3b82f610',
           }}
         >
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent-border)' }}
-          >
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent-border)' }}>
             <Building2 className="w-5 h-5" style={{ color: 'var(--accent)' }} />
           </div>
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest mb-1"
               style={{ color: 'var(--text-dim)' }}>From (Sender)</p>
-            <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
-              {sender.name}
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-              {sender.address}
-            </p>
-            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-              {sender.city}
-            </p>
-            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-              {sender.phone} · {sender.email}
-            </p>
+            <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{sender.name}</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{sender.address}</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{sender.city}</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{sender.phone} · {sender.email}</p>
           </div>
         </div>
 
-        {/* ── Create form ── */}
+        {/* Create form */}
         <div
           className="rounded-2xl border overflow-hidden"
           style={{
@@ -283,10 +254,8 @@ export default function ShippingClient({
               </p>
             </div>
           </div>
-
           <div className="p-6 space-y-5">
             <FormFields form={form} update={update} inputStyle={inputStyle} />
-
             {error && (
               <div className="px-4 py-3 rounded-lg text-sm"
                 style={{ background: '#ef444410', border: '1px solid #ef444430', color: '#ef4444' }}>
@@ -299,7 +268,6 @@ export default function ShippingClient({
                 ✓ Shipping label created!
               </div>
             )}
-
             <div className="flex items-center gap-3 pt-2 border-t"
               style={{ borderColor: 'var(--border-dim)' }}>
               <button onClick={handleSubmit} disabled={submitting}
@@ -318,7 +286,7 @@ export default function ShippingClient({
           </div>
         </div>
 
-        {/* ── Labels history ── */}
+        {/* Labels history */}
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
@@ -334,8 +302,6 @@ export default function ShippingClient({
           {labels.length === 0 ? (
             <div className="rounded-2xl border py-16 text-center"
               style={{ background: 'var(--bg-card)', borderColor: 'var(--border-dim)' }}>
-              <Truck className="w-10 h-10 mx-auto mb-3 opacity-20"
-                style={{ color: 'var(--text-primary)' }} />
               <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                 No labels yet — create your first one above
               </p>
@@ -344,8 +310,7 @@ export default function ShippingClient({
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {paginated.map(label => (
-                  <div
-                    key={label.id}
+                  <div key={label.id}
                     className="rounded-2xl border overflow-hidden transition-all hover:scale-[1.01]"
                     style={{
                       background  : 'var(--bg-card)',
@@ -353,12 +318,9 @@ export default function ShippingClient({
                       boxShadow   : '0 4px 16px rgba(0,0,0,0.1)',
                     }}
                   >
-                    {/* Card top strip */}
                     <div className="h-1"
                       style={{ background: 'linear-gradient(90deg, var(--accent), #8b5cf6)' }} />
-
                     <div className="p-4">
-                      {/* Recipient */}
                       <div className="flex items-start justify-between gap-2 mb-3">
                         <div>
                           <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
@@ -370,17 +332,12 @@ export default function ShippingClient({
                             </p>
                           )}
                         </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full shrink-0"
-                          style={{ background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-border)' }}>
-                          #{label.id.slice(0, 6).toUpperCase()}
-                        </span>
                       </div>
-
                       <div className="space-y-1.5 mb-4">
                         <div className="flex items-start gap-2">
                           <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: 'var(--text-dim)' }} />
                           <div>
-                            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                               {label.recipient_address}
                             </p>
                             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -400,15 +357,11 @@ export default function ShippingClient({
                           </p>
                         )}
                       </div>
-
                       <p className="text-[10px] mb-3" style={{ color: 'var(--text-dim)' }}>
                         Created {format(new Date(label.created_at), 'dd MMM yyyy, hh:mm a')}
                       </p>
-
-                      {/* Actions */}
                       <div className="flex items-center gap-2 pt-3 border-t"
                         style={{ borderColor: 'var(--border-dim)' }}>
-                        {/* Print */}
                         <button
                           onClick={() => handlePrint(label)}
                           className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold border transition-all"
@@ -417,8 +370,6 @@ export default function ShippingClient({
                           <Printer className="w-3.5 h-3.5" />
                           Print PDF
                         </button>
-
-                        {/* Edit */}
                         <button
                           onClick={() => openEdit(label)}
                           className="w-8 h-8 rounded-lg flex items-center justify-center border transition-all"
@@ -434,8 +385,6 @@ export default function ShippingClient({
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
-
-                        {/* Delete */}
                         {confirmDel === label.id ? (
                           <div className="flex items-center gap-1">
                             <button
@@ -474,7 +423,6 @@ export default function ShippingClient({
                 ))}
               </div>
 
-              {/* Pagination */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between pt-2">
                   <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -513,7 +461,7 @@ export default function ShippingClient({
   )
 }
 
-// ── Reusable form fields ──────────────────────────────────────────────────
+// ── Form Fields ────────────────────────────────────────────────────────────
 function FormFields({
   form,
   update,
@@ -559,7 +507,7 @@ function FormFields({
   )
 }
 
-// ── PDF HTML generator ────────────────────────────────────────────────────
+// ── PDF Generator ──────────────────────────────────────────────────────────
 function generateLabelHTML(label: ShippingLabel, sender: Sender): string {
   return `<!DOCTYPE html>
 <html>
@@ -570,13 +518,12 @@ function generateLabelHTML(label: ShippingLabel, sender: Sender): string {
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family : 'Arial', sans-serif;
-      background  : #fff;
-      color       : #000;
-      display     : flex;
-      align-items : center;
+      font-family    : 'Arial', sans-serif;
+      background     : #fff;
+      display        : flex;
+      align-items    : center;
       justify-content: center;
-      min-height  : 100vh;
+      min-height     : 100vh;
     }
 
     @page {
@@ -590,135 +537,113 @@ function generateLabelHTML(label: ShippingLabel, sender: Sender): string {
       display        : flex;
       align-items    : center;
       justify-content: center;
+      padding        : 18mm;
       background     : #fff;
-      padding        : 20mm;
     }
 
     .label {
-      width        : 100%;
-      border       : 2px solid #000;
-      border-radius: 4px;
-      overflow     : hidden;
+      width  : 100%;
+      border : 2px solid #000;
     }
 
-    /* ── Header bar ── */
-    .header {
-      background  : #000;
-      color       : #fff;
-      text-align  : center;
-      padding     : 12px 20px;
-      font-size   : 10px;
-      font-weight : 700;
-      letter-spacing: 5px;
-      text-transform: uppercase;
+    /* ── Top bar ── */
+    .top-bar {
+      display        : flex;
+      align-items    : flex-start;
+      justify-content: space-between;
+      padding        : 12px 16px;
+      border-bottom  : 2px solid #000;
+      gap            : 20px;
     }
 
-    /* ── Address grid ── */
-    .address-grid {
-      display              : grid;
-      grid-template-columns: 1fr 2fr;
-    }
-
-    /* FROM — left column, smaller */
-    .from-box {
-      padding     : 24px 20px;
-      border-right: 2px dashed #bbb;
-      background  : #f7f7f7;
-    }
-
-    /* TO — right column, bigger emphasis */
-    .to-box {
-      padding   : 24px 24px;
-      background: #fff;
-    }
-
-    .section-tag {
-      font-size     : 8px;
-      font-weight   : 700;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color         : #777;
-      margin-bottom : 10px;
-      padding-bottom: 8px;
-      border-bottom : 1px solid #ddd;
-    }
-
-    .from-name {
-      font-size  : 13px;
+    .company-name {
+      font-size  : 15px;
       font-weight: 900;
       color      : #000;
-      line-height: 1.3;
-      margin-bottom: 6px;
     }
 
-    .from-detail {
-      font-size  : 10px;
-      color      : #444;
-      line-height: 1.7;
+    .company-address {
+      font-size  : 9px;
+      color      : #222;
+      line-height: 1.6;
+      text-align : right;
+      max-width  : 260px;
     }
 
-    /* TO — large and prominent */
-    .to-name {
-      font-size    : 24px;
-      font-weight  : 900;
-      color        : #000;
-      line-height  : 1.2;
-      margin-bottom: 4px;
+    /* ── Shipping header ── */
+    .shipping-header {
+      display        : flex;
+      align-items    : center;
+      justify-content: space-between;
+      padding        : 14px 16px;
+      background     : #000;
+      border-bottom  : 2px solid #000;
     }
 
-    .to-company {
-      font-size    : 12px;
-      color        : #444;
-      font-style   : italic;
-      margin-bottom: 12px;
+    .shipping-title {
+      font-size     : 22px;
+      font-weight   : 900;
+      color         : #fff;
+      letter-spacing: 2px;
+      text-transform: uppercase;
     }
 
-    .to-address {
-      font-size  : 14px;
-      color      : #111;
-      line-height: 1.7;
+    /* ── Fields ── */
+    .field-row {
+      display      : flex;
+      border-bottom: 2px solid #000;
     }
 
-    .to-pincode {
-      font-size    : 22px;
-      font-weight  : 900;
-      color        : #000;
-      letter-spacing: 4px;
-      margin-top   : 10px;
-      padding      : 6px 0;
-      border-top   : 1px solid #ddd;
-      border-bottom: 1px solid #ddd;
+    .field-row:last-child {
+      border-bottom: none;
     }
 
-    .to-phone {
-      font-size    : 14px;
-      font-weight  : 700;
-      color        : #000;
-      margin-top   : 10px;
+    .field {
+      flex           : 1;
+      border-right   : 2px solid #000;
+      min-height     : 70px;
+      display        : flex;
+      flex-direction : column;
+      justify-content: space-between;
+      padding        : 8px 12px 10px;
     }
 
-    /* ── Notes ── */
-    .notes {
-      border-top  : 2px dashed #bbb;
-      padding     : 12px 24px;
-      font-size   : 11px;
-      color       : #333;
-      background  : #fafafa;
+    .field:last-child {
+      border-right: none;
     }
 
-    /* ── Footer bar ── */
-    .footer {
-      background   : #000;
-      color        : #aaa;
-      text-align   : center;
-      padding      : 8px 20px;
-      font-size    : 8px;
-      letter-spacing: 1px;
+    .field-label {
+      font-size     : 8px;
+      font-weight   : 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color         : #555;
+    }
+
+    .field-value {
+      font-size  : 18px;
+      font-weight: 900;
+      color      : #000;
+      line-height: 1.2;
+      margin-top : 6px;
+    }
+
+    .field-value.medium {
+      font-size: 14px;
+    }
+
+    .field-value.small {
+      font-size  : 12px;
+      font-weight: 600;
+    }
+
+    .field.tall {
+      min-height: 90px;
     }
 
     @media print {
-      body  { min-height: unset; }
-      .sheet { padding: 15mm; min-height: unset; }
+      body   { min-height: unset; }
+      .sheet { min-height: unset; }
       * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     }
   </style>
@@ -727,43 +652,67 @@ function generateLabelHTML(label: ShippingLabel, sender: Sender): string {
   <div class="sheet">
     <div class="label">
 
-      <!-- Header -->
-      <div class="header">Shipping Label</div>
-
-      <!-- Address grid -->
-      <div class="address-grid">
-
-        <!-- FROM -->
-        <div class="from-box">
-          <div class="section-tag">From</div>
-          <div class="from-name">${sender.name}</div>
-          <div class="from-detail">${sender.address}</div>
-          <div class="from-detail">${sender.city}</div>
-          <div class="from-detail" style="margin-top:6px;font-weight:700;">${sender.phone}</div>
-          <div class="from-detail">${sender.email}</div>
-        </div>
-
-        <!-- TO -->
-        <div class="to-box">
-          <div class="section-tag">To</div>
-          <div class="to-name">${label.recipient_name}</div>
-          ${label.recipient_company
-            ? `<div class="to-company">${label.recipient_company}</div>`
-            : ''
-          }
-          <div class="to-address">${label.recipient_address}</div>
-          <div class="to-address">${label.recipient_city}</div>
-          <div class="to-pincode">${label.recipient_pincode}</div>
-          <div class="to-phone">${label.recipient_phone}</div>
+      <!-- Top bar -->
+      <div class="top-bar">
+        <div class="company-name">${sender.name}</div>
+        <div class="company-address">
+          ${sender.phone}<br/>
+          ${sender.address}<br/>
+          ${sender.city}<br/>
+          ${sender.email}
         </div>
       </div>
 
-      ${label.notes
-        ? `<div class="notes"><strong>Note: </strong>${label.notes}</div>`
-        : ''
-      }
+      <!-- Shipping header -->
+      <div class="shipping-header">
+        <div class="shipping-title">Shipping Information</div>
+      </div>
 
+      <!-- Row 1: Name | Phone -->
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Name</div>
+          <div class="field-value">${label.recipient_name}</div>
+        </div>
+        <div class="field">
+          <div class="field-label">Phone Number</div>
+          <div class="field-value">${label.recipient_phone}</div>
+        </div>
+      </div>
 
+      ${label.recipient_company ? `
+      <!-- Row: Company -->
+      <div class="field-row">
+        <div class="field" style="border-right:none;">
+          <div class="field-label">Company</div>
+          <div class="field-value medium">${label.recipient_company}</div>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Row 2: Address -->
+      <div class="field-row">
+        <div class="field tall" style="border-right:none;">
+          <div class="field-label">Address</div>
+          <div class="field-value">${label.recipient_address}</div>
+        </div>
+      </div>
+
+      <!-- Row 3: City | Code/ZIP | Content -->
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">City</div>
+          <div class="field-value">${label.recipient_city}</div>
+        </div>
+        <div class="field">
+          <div class="field-label">Code / ZIP</div>
+          <div class="field-value">${label.recipient_pincode}</div>
+        </div>
+        <div class="field">
+          <div class="field-label">Content</div>
+          <div class="field-value">${label.notes ?? '—'}</div>
+        </div>
+      </div>
 
     </div>
   </div>
@@ -772,8 +721,5 @@ function generateLabelHTML(label: ShippingLabel, sender: Sender): string {
 }
 
 function generateBarLines(): string {
-  const widths = [2,1,3,1,2,4,1,2,1,3,2,1,4,1,2,3,1,2,1,3,2,4,1,2,1,3,2,1,3,1,2,4,1,2]
-  return widths.map((w, i) =>
-    `<div class="bar" style="width:${w}px;height:${20 + (i % 3) * 8}px;"></div>`
-  ).join('')
+  return ''
 }
