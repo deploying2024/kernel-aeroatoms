@@ -32,35 +32,28 @@ export default function OrderHistory({
 }) {
   const router = useRouter()
 
-  /* ── filters ── */
   const [searchCompany,  setSearchCompany]  = useState('')
   const [filterProduct,  setFilterProduct]  = useState('all')
   const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>()
   const [filterDateTo,   setFilterDateTo]   = useState<Date | undefined>()
   const [calFromOpen,    setCalFromOpen]    = useState(false)
   const [calToOpen,      setCalToOpen]      = useState(false)
-
-  /* ── pagination ── */
-  const [page, setPage] = useState(1)
-
-  /* ── edit / delete ── */
-  const [editOrder,    setEditOrder]    = useState<GroupedOrder | null>(null)
-  const [deletingId,   setDeletingId]   = useState<string | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [page,           setPage]           = useState(1)
+  const [editOrder,      setEditOrder]      = useState<GroupedOrder | null>(null)
+  const [deletingId,     setDeletingId]     = useState<string | null>(null)
+  const [confirmDelete,  setConfirmDelete]  = useState<string | null>(null)
 
   const fmt = (n: number) =>
-  new Intl.NumberFormat('en-IN', {
-    style                : 'currency',
-    currency             : 'INR',
-    maximumFractionDigits: 0,
-  }).format(n)
+    new Intl.NumberFormat('en-IN', {
+      style                : 'currency',
+      currency             : 'INR',
+      maximumFractionDigits: 2,
+    }).format(n)
 
-  /* ── all unique products across orders ── */
   const uniqueProducts = [...new Set(
     orders.flatMap(o => o.items.map(i => i.product_name)).filter(Boolean)
   )]
 
-  /* ── filter logic ── */
   const filtered = orders.filter(o => {
     const d = new Date(o.order_date)
     const matchCompany = !searchCompany ||
@@ -72,15 +65,11 @@ export default function OrderHistory({
     return matchCompany && matchProduct && matchFrom && matchTo
   })
 
-  /* ── pagination ── */
-  const totalPages  = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const safePage    = Math.min(page, totalPages)
-  const paginated   = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-  const totalFiltered = filtered.reduce((s, o) => s + o.total, 0)
+  const totalPages     = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage       = Math.min(page, totalPages)
+  const paginated      = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const totalFiltered  = filtered.reduce((s, o) => s + (o.total_with_tax ?? o.total), 0)
 
-  const resetPage = () => setPage(1)
-
-  /* ── delete ── */
   const handleDelete = async (orderId: string) => {
     setDeletingId(orderId)
     const sb = createClient()
@@ -99,7 +88,6 @@ export default function OrderHistory({
 
   return (
     <>
-      {/* Edit modal */}
       {editOrder && (
         <EditOrderModal
           order={editOrder}
@@ -110,6 +98,7 @@ export default function OrderHistory({
       )}
 
       <div className="space-y-5">
+
         {/* Section header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -122,9 +111,14 @@ export default function OrderHistory({
             </span>
           </div>
           {filtered.length > 0 && (
-            <span className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
-              Total: <span style={{ color: 'var(--accent)' }}>{fmt(totalFiltered)}</span>
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                Total (incl. tax):
+              </span>
+              <span className="text-sm font-bold" style={{ color: 'var(--accent)' }}>
+                {fmt(totalFiltered)}
+              </span>
+            </div>
           )}
         </div>
 
@@ -137,15 +131,16 @@ export default function OrderHistory({
               style={{ color: 'var(--text-dim)' }}>Filters</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5"
                 style={{ color: 'var(--text-dim)' }} />
               <Input placeholder="Search company…" value={searchCompany}
-                onChange={e => { setSearchCompany(e.target.value); resetPage() }}
+                onChange={e => { setSearchCompany(e.target.value); setPage(1) }}
                 className="pl-9 h-9 text-sm border rounded-lg" style={inputStyle} />
             </div>
 
-            <Select value={filterProduct} onValueChange={v => { setFilterProduct(v); resetPage() }}>
+            <Select value={filterProduct} onValueChange={v => { setFilterProduct(v); setPage(1) }}>
               <SelectTrigger className="h-9 text-sm border rounded-lg" style={inputStyle}>
                 <SelectValue placeholder="All products" />
               </SelectTrigger>
@@ -168,7 +163,8 @@ export default function OrderHistory({
               <PopoverContent className="w-auto p-0"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border-dim)' }}>
                 <Calendar mode="single" selected={filterDateFrom}
-                  onSelect={d => { setFilterDateFrom(d); setCalFromOpen(false); resetPage() }} initialFocus />
+                  onSelect={d => { setFilterDateFrom(d); setCalFromOpen(false); setPage(1) }}
+                  initialFocus />
               </PopoverContent>
             </Popover>
 
@@ -183,14 +179,18 @@ export default function OrderHistory({
               <PopoverContent className="w-auto p-0"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border-dim)' }}>
                 <Calendar mode="single" selected={filterDateTo}
-                  onSelect={d => { setFilterDateTo(d); setCalToOpen(false); resetPage() }} initialFocus />
+                  onSelect={d => { setFilterDateTo(d); setCalToOpen(false); setPage(1) }}
+                  initialFocus />
               </PopoverContent>
             </Popover>
           </div>
 
           {(searchCompany || filterProduct !== 'all' || filterDateFrom || filterDateTo) && (
             <button
-              onClick={() => { setSearchCompany(''); setFilterProduct('all'); setFilterDateFrom(undefined); setFilterDateTo(undefined); resetPage() }}
+              onClick={() => {
+                setSearchCompany(''); setFilterProduct('all')
+                setFilterDateFrom(undefined); setFilterDateTo(undefined); setPage(1)
+              }}
               className="mt-3 flex items-center gap-1.5 text-xs"
               style={{ color: 'var(--neon-pink)' }}>
               <Trash2 className="w-3 h-3" /> Clear all filters
@@ -210,10 +210,10 @@ export default function OrderHistory({
             </div>
           ) : paginated.map(order => (
             <div key={order.order_id}
-              className="rounded-xl border overflow-hidden transition-all"
+              className="rounded-xl border overflow-hidden transition-colors"
               style={{ background: 'var(--bg-card)', borderColor: 'var(--border-dim)' }}>
 
-              {/* Order header row */}
+              {/* Order header */}
               <div className="flex items-center justify-between px-5 py-3 border-b"
                 style={{ borderColor: 'var(--border-dim)', background: 'var(--bg-secondary)' }}>
                 <div className="flex items-center gap-3">
@@ -233,21 +233,34 @@ export default function OrderHistory({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold mr-2" style={{ color: 'var(--accent)' }}>
-                    {fmt(order.total)}
-                  </span>
+                  {/* Tax + total */}
+                  <div className="flex items-center gap-2 mr-2">
+                    <div className="text-right">
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        {fmt(order.total)}
+                        {order.tax_rate > 0 && (
+                          <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold"
+                            style={{ background: '#f59e0b15', color: '#f59e0b' }}>
+                            +{order.tax_rate}% GST
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-sm font-black" style={{ color: 'var(--accent)' }}>
+                        {fmt(order.total_with_tax ?? order.total)}
+                      </p>
+                    </div>
+                  </div>
 
                   {/* Edit */}
-                  <button
-                    onClick={() => setEditOrder(order)}
+                  <button onClick={() => setEditOrder(order)}
                     className="w-8 h-8 rounded-lg flex items-center justify-center border transition-all"
                     style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}
                     onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.color = 'var(--accent)'
+                      ;(e.currentTarget as HTMLElement).style.color = 'var(--accent)'
                       ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--accent-border)'
                     }}
                     onMouseLeave={e => {
-                      (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
+                      ;(e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
                       ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-dim)'
                     }}>
                     <Pencil className="w-3.5 h-3.5" />
@@ -263,24 +276,22 @@ export default function OrderHistory({
                         style={{ background: 'var(--neon-pink)', color: '#fff' }}>
                         {deletingId === order.order_id ? '…' : 'Confirm'}
                       </button>
-                      <button
-                        onClick={() => setConfirmDelete(null)}
+                      <button onClick={() => setConfirmDelete(null)}
                         className="px-3 py-1 rounded-lg text-xs border"
                         style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
                         Cancel
                       </button>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => setConfirmDelete(order.order_id)}
+                    <button onClick={() => setConfirmDelete(order.order_id)}
                       className="w-8 h-8 rounded-lg flex items-center justify-center border transition-all"
                       style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}
                       onMouseEnter={e => {
-                        (e.currentTarget as HTMLElement).style.color = 'var(--neon-pink)'
+                        ;(e.currentTarget as HTMLElement).style.color = 'var(--neon-pink)'
                         ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--neon-pink)'
                       }}
                       onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
+                        ;(e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
                         ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-dim)'
                       }}>
                       <Trash2 className="w-3.5 h-3.5" />
@@ -295,7 +306,8 @@ export default function OrderHistory({
                   <div key={item.id}
                     className="flex items-center justify-between px-5 py-2.5">
                     <div className="flex items-center gap-2">
-                      <Package className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-dim)' }} />
+                      <Package className="w-3.5 h-3.5 shrink-0"
+                        style={{ color: 'var(--text-dim)' }} />
                       <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
                         {item.product_name}
                       </span>
@@ -315,6 +327,30 @@ export default function OrderHistory({
                   </div>
                 ))}
               </div>
+
+              {/* Tax summary row */}
+              {order.tax_rate > 0 && (
+                <div className="flex items-center justify-between px-5 py-2 border-t"
+                  style={{ borderColor: 'var(--border-dim)', background: 'var(--bg-secondary)' }}>
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    Subtotal
+                  </span>
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                    {fmt(order.total)}
+                  </span>
+                </div>
+              )}
+              {order.tax_rate > 0 && (
+                <div className="flex items-center justify-between px-5 py-2 border-t"
+                  style={{ borderColor: 'var(--border-dim)', background: 'var(--bg-secondary)' }}>
+                  <span className="text-xs" style={{ color: '#f59e0b' }}>
+                    GST ({order.tax_rate}%)
+                  </span>
+                  <span className="text-xs font-semibold" style={{ color: '#f59e0b' }}>
+                    + {fmt(order.tax_amount ?? 0)}
+                  </span>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -326,41 +362,34 @@ export default function OrderHistory({
               Page {safePage} of {totalPages} · {filtered.length} orders
             </p>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={safePage === 1}
-                className="w-8 h-8 rounded-lg flex items-center justify-center border transition-all disabled:opacity-30"
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1}
+                className="w-8 h-8 rounded-lg flex items-center justify-center border disabled:opacity-30"
                 style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
                 <ChevronLeft className="w-4 h-4" />
               </button>
-
               {Array.from({ length: totalPages }, (_, i) => i + 1)
                 .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
                 .reduce<(number | '...')[]>((acc, p, i, arr) => {
-                  if (i > 0 && typeof arr[i-1] === 'number' && (p as number) - (arr[i-1] as number) > 1)
+                  if (i > 0 && typeof arr[i - 1] === 'number' && (p as number) - (arr[i - 1] as number) > 1)
                     acc.push('...')
                   acc.push(p)
                   return acc
                 }, [])
                 .map((p, i) => p === '...'
-                  ? <span key={`ellipsis-${i}`} className="w-8 text-center text-sm"
+                  ? <span key={`e-${i}`} className="w-8 text-center text-sm"
                       style={{ color: 'var(--text-dim)' }}>…</span>
-                  : <button key={p}
-                      onClick={() => setPage(p as number)}
-                      className="w-8 h-8 rounded-lg text-sm font-medium border transition-all"
+                  : <button key={p} onClick={() => setPage(p as number)}
+                      className="w-8 h-8 rounded-lg text-sm font-medium border"
                       style={{
                         background  : safePage === p ? 'var(--accent)' : 'transparent',
                         borderColor : safePage === p ? 'var(--accent)' : 'var(--border-dim)',
-                        color       : safePage === p ? '#000' : 'var(--text-secondary)',
+                        color       : safePage === p ? '#fff' : 'var(--text-secondary)',
                       }}>
                       {p}
                     </button>
                 )}
-
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={safePage === totalPages}
-                className="w-8 h-8 rounded-lg flex items-center justify-center border transition-all disabled:opacity-30"
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
+                className="w-8 h-8 rounded-lg flex items-center justify-center border disabled:opacity-30"
                 style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
                 <ChevronRight className="w-4 h-4" />
               </button>

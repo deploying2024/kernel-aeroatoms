@@ -2,10 +2,11 @@ export const runtime = 'edge'
 
 import { createClient } from '@/lib/supabase/server'
 import {
-  TrendingUp, ShoppingCart, Building2,
-  Package, Activity, DollarSign,
+  ShoppingCart, Building2,
+  Package, Activity,
 } from 'lucide-react'
-import RevenueChart from '@/components/revenue-chart'
+import RevenueChart  from '@/components/revenue-chart'
+import RevenueToggle from '@/components/revenue-toggle'
 
 async function getUsdRate(): Promise<number> {
   try {
@@ -23,44 +24,61 @@ async function getUsdRate(): Promise<number> {
 export default async function DashboardPage() {
   const supabase = await createClient()
 
-  const [usdRate, revenueData, ordersData, productData, companyData, chartRaw] =
-    await Promise.all([
-      getUsdRate(),
-      supabase.from('order_summary').select('line_total'),
-      supabase.from('order_summary').select('order_id'),
-      supabase.from('order_summary').select('product_name, quantity'),
-      supabase.from('order_summary').select('company_name, line_total'),
-      supabase.from('order_summary').select('order_date, line_total').order('order_date', { ascending: true }),
-    ])
+  const [
+    usdRate,
+    { data: revenueData },
+    { data: ordersData  },
+    { data: productData },
+    { data: companyData },
+    { data: chartRaw    },
+  ] = await Promise.all([
+    getUsdRate(),
+    supabase.from('order_summary').select('line_total, line_tax'),
+    supabase.from('order_summary').select('order_id'),
+    supabase.from('order_summary').select('product_name, quantity'),
+    supabase.from('order_summary').select('company_name, line_total'),
+    supabase.from('order_summary').select('order_date, line_total').order('order_date', { ascending: true }),
+  ])
 
-  const totalRevenue    = revenueData.data?.reduce((s, r) => s + (r.line_total ?? 0), 0) ?? 0
-  const totalRevenueUSD = totalRevenue * usdRate
-  const totalOrders     = new Set(ordersData.data?.map(r => r.order_id)).size
-  const totalUnitsSold  = productData.data?.reduce((s, r) => s + (r.quantity ?? 0), 0) ?? 0
+  // ── Revenue ──
+  const totalNetRevenue   = revenueData?.reduce((s, r) => s + (r.line_total ?? 0), 0) ?? 0
+  const totalGrossRevenue = revenueData?.reduce((s, r) =>
+    s + (r.line_total ?? 0) + (r.line_tax ?? 0), 0) ?? 0
+  const totalNetUSD   = totalNetRevenue   * usdRate
+  const totalGrossUSD = totalGrossRevenue * usdRate
+
+  // ── Orders ──
+  const totalOrders = new Set(ordersData?.map(r => r.order_id)).size
+
+  // ── Products ──
+  const totalUnitsSold = productData?.reduce((s, r) => s + (r.quantity ?? 0), 0) ?? 0
 
   const productMap: Record<string, number> = {}
-  productData.data?.forEach(r => {
+  productData?.forEach(r => {
     if (!r.product_name) return
     productMap[r.product_name] = (productMap[r.product_name] ?? 0) + (r.quantity ?? 0)
   })
   const topProducts = Object.entries(productMap).sort((a, b) => b[1] - a[1]).slice(0, 5)
 
+  // ── Companies ──
   const companyMap: Record<string, number> = {}
-  companyData.data?.forEach(r => {
+  companyData?.forEach(r => {
     if (!r.company_name) return
     companyMap[r.company_name] = (companyMap[r.company_name] ?? 0) + (r.line_total ?? 0)
   })
-  const topCompanies  = Object.entries(companyMap).sort((a, b) => b[1] - a[1]).slice(0, 5)
+  const topCompanies   = Object.entries(companyMap).sort((a, b) => b[1] - a[1]).slice(0, 5)
   const totalCompanies = Object.keys(companyMap).length
 
+  // ── Chart ──
   const monthMap: Record<string, number> = {}
-  chartRaw.data?.forEach(r => {
+  chartRaw?.forEach(r => {
     if (!r.order_date) return
     const m = r.order_date.slice(0, 7)
     monthMap[m] = (monthMap[m] ?? 0) + (r.line_total ?? 0)
   })
   const revenueByMonth = Object.entries(monthMap).map(([month, total]) => ({ month, total }))
 
+  // ── Formatters ──
   const fmtINR = (n: number) =>
     new Intl.NumberFormat('en-IN', {
       style                : 'currency',
@@ -68,27 +86,11 @@ export default async function DashboardPage() {
       maximumFractionDigits: 0,
     }).format(n)
 
-  const fmtUSD = (n: number) =>
-    new Intl.NumberFormat('en-US', {
-      style                : 'currency',
-      currency             : 'USD',
-      maximumFractionDigits: 2,
-    }).format(n)
-
+  // ── Other stat cards ──
   const stats = [
-    {
-      label   : 'Total Revenue',
-      value   : fmtINR(totalRevenue),
-      subvalue: fmtUSD(totalRevenueUSD),
-      sublabel: `@ 1 USD = ₹${(1 / usdRate).toFixed(2)}`,
-      icon    : TrendingUp,
-      color   : '#3b82f6',
-      badge   : 'All time',
-    },
     {
       label   : 'Total Orders',
       value   : String(totalOrders),
-      subvalue: null,
       sublabel: 'orders placed',
       icon    : ShoppingCart,
       color   : '#8b5cf6',
@@ -97,7 +99,6 @@ export default async function DashboardPage() {
     {
       label   : 'Units Sold',
       value   : totalUnitsSold.toLocaleString(),
-      subvalue: null,
       sublabel: 'across all orders',
       icon    : Package,
       color   : '#f59e0b',
@@ -106,7 +107,6 @@ export default async function DashboardPage() {
     {
       label   : 'Companies',
       value   : String(totalCompanies),
-      subvalue: null,
       sublabel: 'active clients',
       icon    : Building2,
       color   : '#10b981',
@@ -117,7 +117,7 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen grid-bg animate-fade-up">
 
-      {/* Page Header */}
+      {/* ── Page Header ── */}
       <div
         className="px-6 md:px-10 pt-8 pb-6 border-b"
         style={{ borderColor: 'var(--border-dim)', background: 'var(--bg-secondary)' }}
@@ -156,6 +156,18 @@ export default async function DashboardPage() {
 
         {/* ── Stat Cards ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+          {/* Revenue toggle card */}
+          <RevenueToggle
+            grossINR={totalGrossRevenue}
+            netINR={totalNetRevenue}
+            grossUSD={totalGrossUSD}
+            netUSD={totalNetUSD}
+            usdRate={usdRate}
+            color="#3b82f6"
+          />
+
+          {/* Other stats */}
           {stats.map(s => {
             const Icon = s.icon
             return (
@@ -196,36 +208,20 @@ export default async function DashboardPage() {
                   </span>
                 </div>
 
-                {/* Label */}
                 <p className="relative text-xs font-semibold uppercase tracking-wider mb-1"
                   style={{ color: 'var(--text-secondary)' }}>
                   {s.label}
                 </p>
-
-                {/* Main value */}
                 <p className="relative text-2xl font-black tracking-tight"
                   style={{ color: 'var(--text-primary)' }}>
                   {s.value}
                 </p>
-
-                {/* USD subvalue */}
-                {s.subvalue && (
-                  <div className="relative mt-2 flex items-center gap-1.5">
-                    <DollarSign className="w-3 h-3" style={{ color: '#10b981' }} />
-                    <span className="text-sm font-bold" style={{ color: '#10b981' }}>
-                      {s.subvalue}
-                    </span>
-                  </div>
-                )}
-
-                {/* Sublabel */}
                 <p className="relative text-xs mt-1" style={{ color: 'var(--text-dim)' }}>
                   {s.sublabel}
                 </p>
 
-                {/* Bottom accent line */}
                 <div
-                  className="absolute bottom-0 left-0 right-0 h-0.5"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 rounded-b-2xl"
                   style={{ background: `linear-gradient(90deg, ${s.color}, transparent)` }}
                 />
               </div>
@@ -247,20 +243,20 @@ export default async function DashboardPage() {
               className="w-7 h-7 rounded-lg flex items-center justify-center"
               style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent-border)' }}
             >
-              <TrendingUp className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+              <ShoppingCart className="w-4 h-4" style={{ color: 'var(--accent)' }} />
             </div>
             <div>
               <h2 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
                 Revenue Over Time
               </h2>
               <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                Monthly breakdown
+                Monthly net revenue (₹)
               </p>
             </div>
             <div className="ml-auto flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full" style={{ background: 'var(--accent)' }} />
               <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                Monthly Revenue (₹)
+                Monthly Revenue
               </span>
             </div>
           </div>

@@ -19,19 +19,21 @@ export type OrderItem = {
 }
 
 export type OrderRow = {
-  order_id    : string
-  order_date  : string
-  company_id  : string
-  company_name: string
-  item_id     : string
-  product_id  : string
-  product_name: string
-  quantity    : number
-  price_per_unit: number
-  line_total  : number
+  order_id           : string
+  order_date         : string
+  company_id         : string
+  company_name       : string
+  item_id            : string
+  product_id         : string
+  product_name       : string
+  quantity           : number
+  price_per_unit     : number
+  line_total         : number
+  line_tax           : number
+  line_total_with_tax: number
+  tax_rate           : number
 }
 
-// Grouped order (one order with multiple items)
 export type GroupedOrder = {
   order_id    : string
   order_date  : string
@@ -39,6 +41,9 @@ export type GroupedOrder = {
   company_name: string
   items       : OrderItem[]
   total       : number
+  tax_rate    : number
+  tax_amount  : number
+  total_with_tax: number
 }
 
 export type Vendor = {

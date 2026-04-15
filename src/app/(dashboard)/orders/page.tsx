@@ -18,31 +18,36 @@ export default async function OrdersPage() {
     .from('order_summary').select('*').order('order_date', { ascending: false })
 
   // Group flat rows into orders with multiple items
-  const orderMap = new Map<string, GroupedOrder>()
-  ;(rows as OrderRow[] ?? []).forEach(row => {
-    if (!orderMap.has(row.order_id)) {
-      orderMap.set(row.order_id, {
-        order_id    : row.order_id,
-        order_date  : row.order_date,
-        company_id  : row.company_id,
-        company_name: row.company_name,
-        items       : [],
-        total       : 0,
-      })
-    }
-    const order = orderMap.get(row.order_id)!
-    if (row.item_id) {
-      order.items.push({
-        id            : row.item_id,
-        product_id    : row.product_id,
-        product_name  : row.product_name,
-        quantity      : row.quantity,
-        price_per_unit: row.price_per_unit,
-        line_total    : row.line_total,
-      })
-      order.total += row.line_total ?? 0
-    }
-  })
+const orderMap = new Map<string, GroupedOrder>()
+;(rows as OrderRow[] ?? []).forEach(row => {
+  if (!orderMap.has(row.order_id)) {
+    orderMap.set(row.order_id, {
+      order_id      : row.order_id,
+      order_date    : row.order_date,
+      company_id    : row.company_id,
+      company_name  : row.company_name,
+      items         : [],
+      total         : 0,
+      tax_rate      : row.tax_rate ?? 18,
+      tax_amount    : 0,
+      total_with_tax: 0,
+    })
+  }
+  const order = orderMap.get(row.order_id)!
+  if (row.item_id) {
+    order.items.push({
+      id            : row.item_id,
+      product_id    : row.product_id,
+      product_name  : row.product_name,
+      quantity      : row.quantity,
+      price_per_unit: row.price_per_unit,
+      line_total    : row.line_total,
+    })
+    order.total          += row.line_total         ?? 0
+    order.tax_amount     += row.line_tax           ?? 0
+    order.total_with_tax += row.line_total_with_tax ?? 0
+  }
+})
 
   const groupedOrders = Array.from(orderMap.values())
 
