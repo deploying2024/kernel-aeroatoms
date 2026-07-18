@@ -119,3 +119,26 @@ export type ShippingLabel = {
   created_at        : string
   updated_at        : string
 }
+
+export type CostSheetItem = {
+  id            : string
+  cost_sheet_id : string
+  component_name: string
+  quantity      : number
+  unit_price    : number
+  currency      : 'INR' | 'USD'
+  sort_order    : number
+}
+
+export type CostSheet = {
+  id          : string
+  product_id  : string
+  product_name: string
+  assembly_qty: number
+  version     : number
+  notes       : string | null
+  created_at  : string
+  items       : CostSheetItem[]
+  total_inr   : number
+  per_unit_inr: number
+}

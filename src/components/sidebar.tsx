@@ -7,8 +7,9 @@ import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, ShoppingCart, PackagePlus,
   PackageMinus, BarChart3, Gauge, Truck,
-  LogOut, Plane, ChevronLeft, ChevronRight,
-  Menu, X, Sun, Moon,
+  Calculator, LogOut, Plane,
+  ChevronLeft, ChevronRight, Menu, X,
+  Sun, Moon,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTheme } from 'next-themes'
@@ -22,6 +23,7 @@ const navItems = [
   { label: 'Inventory Value', href: '/inventory-value',   icon: BarChart3       },
   { label: 'Yield Rate',      href: '/yield-rate',        icon: Gauge           },
   { label: 'Shipping',        href: '/shipping',          icon: Truck           },
+  { label: 'Cost Price',      href: '/cost-price',        icon: Calculator      },
 ]
 
 // ── Extracted outside to avoid "component created during render" error ──
