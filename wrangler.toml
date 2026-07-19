@@ -1,14 +1,22 @@
 name = "kernel-aeroatoms"
-
 main = ".open-next/worker.js"
-
-compatibility_date = "2026-07-18"
-
+compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
+
+[vars]
+NEXT_PUBLIC_SUPABASE_URL      = "your_supabase_url"
+NEXT_PUBLIC_SUPABASE_ANON_KEY = "your_anon_key"
+NEXT_PUBLIC_COMPANY_NAME      = "AeroAtoms Pvt. Ltd."
+NEXT_PUBLIC_COMPANY_ADDRESS   = "Your Address"
+NEXT_PUBLIC_COMPANY_CITY      = "City, State - Pincode"
+NEXT_PUBLIC_COMPANY_PHONE     = "+91 XXXXX XXXXX"
+NEXT_PUBLIC_COMPANY_EMAIL     = "hello@aeroatoms.com"
+
+[[rules]]
+type    = "ESModule"
+globs   = ["**/*.js"]
+fallthrough = true
 
 [assets]
 directory = ".open-next/assets"
-binding = "ASSETS"
-
-[observability]
-enabled = true
+binding   = "ASSETS"
