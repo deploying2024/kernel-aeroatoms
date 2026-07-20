@@ -1,5 +1,3 @@
-export const runtime = 'edge'
-
 import { createClient } from '@/lib/supabase/server'
 import CostPriceClient from '@/components/cost-price/cost-price-client'
 import { Calculator } from 'lucide-react'
