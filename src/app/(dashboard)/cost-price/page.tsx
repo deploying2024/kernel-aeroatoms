@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 
 import { createClient } from '@/lib/supabase/server'
 import CostPriceClient from '@/components/cost-price/cost-price-client'
@@ -27,11 +28,15 @@ export default async function CostPricePage() {
   const { data: sheetsRaw } = await supabase
     .from('cost_sheets')
     .select(`
-      id, product_id, assembly_qty, version, notes, failure_rate, created_at,
+      id, product_id, assembly_qty, version, notes,
+      failure_rate, selling_price, created_at,
       products ( name ),
       cost_sheet_items (
         id, cost_sheet_id, component_name,
         quantity, unit_price, currency, customs_percent, sort_order
+      ),
+      cost_sheet_onetime (
+        id, cost_sheet_id, label, amount, currency, sort_order
       )
     `)
     .order('created_at', { ascending: false })
@@ -39,22 +44,49 @@ export default async function CostPricePage() {
   const usdToInr = await getUsdRate()
 
   const sheets = (sheetsRaw ?? []).map((s: any) => {
-    const items = (s.cost_sheet_items ?? []).sort(
-      (a: any, b: any) => a.sort_order - b.sort_order
-    )
+    const items   = (s.cost_sheet_items   ?? []).sort((a: any, b: any) => a.sort_order - b.sort_order)
+    const onetime = (s.cost_sheet_onetime ?? []).sort((a: any, b: any) => a.sort_order - b.sort_order)
+
     const failureRate = s.failure_rate ?? 0
-    const perUnit = items.reduce((sum: number, item: any) => {
-      const priceInr   = item.currency === 'USD'
+
+    // BOM base (components only, no customs)
+    let bomBase     = 0
+    let customsTotal = 0
+
+    items.forEach((item: any) => {
+      const priceInr = item.currency === 'USD'
         ? item.unit_price * usdToInr
         : item.unit_price
-      const lineBase   = priceInr * item.quantity
-      const customs    = lineBase * (item.customs_percent ?? 0) / 100
-      return sum + lineBase + customs
+      const lineBase = priceInr * item.quantity
+      const customs  = lineBase * (item.customs_percent ?? 0) / 100
+      bomBase      += lineBase
+      customsTotal += customs
+    })
+
+    const bomPerUnit     = bomBase + customsTotal
+
+    // Effective BOM after failure rate
+    const effectiveBom = failureRate > 0 && failureRate < 100
+      ? bomPerUnit / (1 - failureRate / 100)
+      : bomPerUnit
+
+    const failureImpact = effectiveBom - bomPerUnit
+
+    // One-time costs
+    const onetimeTotal = onetime.reduce((sum: number, ot: any) => {
+      const inr = ot.currency === 'USD' ? ot.amount * usdToInr : ot.amount
+      return sum + inr
     }, 0)
-    // Effective per unit = BOM cost / (1 - failure_rate/100)
-    const effectivePerUnit = failureRate > 0 && failureRate < 100
-      ? perUnit / (1 - failureRate / 100)
-      : perUnit
+
+    const amortizedPerUnit = s.assembly_qty > 0 ? onetimeTotal / s.assembly_qty : 0
+    const trueCostPerUnit  = effectiveBom + amortizedPerUnit
+
+    // Selling & margin
+    const sellingPrice  = s.selling_price ?? 0
+    const profitPerUnit = sellingPrice - trueCostPerUnit
+    const marginPercent = sellingPrice > 0 ? (profitPerUnit / sellingPrice) * 100 : 0
+    const totalProfit   = profitPerUnit * s.assembly_qty
+
     return {
       id                : s.id,
       product_id        : s.product_id,
@@ -63,11 +95,23 @@ export default async function CostPricePage() {
       version           : s.version,
       notes             : s.notes,
       failure_rate      : failureRate,
+      selling_price     : sellingPrice,
       created_at        : s.created_at,
       items,
-      bom_per_unit      : perUnit,
-      total_inr         : effectivePerUnit * s.assembly_qty,
-      per_unit_inr      : effectivePerUnit,
+      onetime,
+      bom_base          : bomBase,
+      customs_total     : customsTotal,
+      bom_per_unit      : bomPerUnit,
+      effective_bom     : effectiveBom,
+      failure_impact    : failureImpact,
+      onetime_total     : onetimeTotal,
+      amortized_per_unit: amortizedPerUnit,
+      true_cost_per_unit: trueCostPerUnit,
+      total_inr         : trueCostPerUnit * s.assembly_qty,
+      per_unit_inr      : trueCostPerUnit,
+      profit_per_unit   : profitPerUnit,
+      margin_percent    : marginPercent,
+      total_profit      : totalProfit,
     }
   })
 
@@ -91,7 +135,7 @@ export default async function CostPricePage() {
                 Cost Price
               </h1>
               <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                Build and track product cost sheets with live USD/INR conversion
+                BOM · One-time costs · Margin analysis
               </p>
             </div>
           </div>

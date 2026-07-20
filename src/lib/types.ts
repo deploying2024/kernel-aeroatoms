@@ -142,3 +142,12 @@ export type CostSheet = {
   total_inr   : number
   per_unit_inr: number
 }
+
+export type CostSheetOnetime = {
+  id            : string
+  cost_sheet_id : string
+  label         : string
+  amount        : number
+  currency      : 'INR' | 'USD'
+  sort_order    : number
+}

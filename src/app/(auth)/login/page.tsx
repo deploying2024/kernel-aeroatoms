@@ -20,14 +20,18 @@ export default function LoginPage() {
     return () => clearTimeout(t)
   }, [])
 
-  const handleLogin = async () => {
-    setLoading(true); setError(null)
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError(error.message); setLoading(false); return }
-    router.push('/dashboard')
-    router.refresh()
-  }
+const handleLogin = async () => {
+  setLoading(true); setError(null)
+  const supabase = createClient()
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) { setError(error.message); setLoading(false); return }
+
+  // ── Record login time for 2hr auto logout ──
+  localStorage.setItem('kernel_login_time', String(Date.now()))
+
+  router.push('/dashboard')
+  router.refresh()
+}
 
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden"
