@@ -26,7 +26,7 @@ export default async function CostPricePage() {
   const { data: sheetsRaw } = await supabase
     .from('cost_sheets')
     .select(`
-      id, product_id, assembly_qty, version, notes,
+      id, product_id, assembly_qty, version, notes, 
       failure_rate, selling_price, created_at,
       products ( name ),
       cost_sheet_items (
