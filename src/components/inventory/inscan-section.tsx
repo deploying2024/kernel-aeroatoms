@@ -10,12 +10,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format } from 'date-fns'
 import {
   CalendarIcon, PackagePlus, Hash,
-  DollarSign, FileText, X, Check, Plus,
+  FileText, X, Check, Plus,
 } from 'lucide-react'
 import CreatableCombobox from '@/components/creatable-combobox'
 import type { Vendor, Material } from '@/lib/types'
 
-// ── Create Material Modal ──────────────────────────────────────────────────
+// ── Create Material Modal ─────────────────────────────────────────────────────
 function CreateMaterialModal({
   name,
   initialTypes,
@@ -78,7 +78,6 @@ function CreateMaterialModal({
         className="w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden animate-fade-up mb-8"
         style={{ background: 'var(--bg-card)', borderColor: 'var(--accent-border)' }}
       >
-        {/* Header */}
         <div
           className="relative px-6 pt-6 pb-5 border-b overflow-hidden"
           style={{ borderColor: 'var(--border-dim)' }}
@@ -126,8 +125,6 @@ function CreateMaterialModal({
         </div>
 
         <div className="p-6 space-y-5">
-
-          {/* Component type */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-xs font-bold uppercase tracking-widest"
@@ -137,18 +134,13 @@ function CreateMaterialModal({
               <button
                 onClick={() => { setShowNewType(v => !v); setNewTypeName('') }}
                 className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border transition-all"
-                style={{
-                  borderColor : 'var(--accent-border)',
-                  color       : 'var(--accent)',
-                  background  : 'var(--accent-soft)',
-                }}
+                style={{ borderColor: 'var(--accent-border)', color: 'var(--accent)', background: 'var(--accent-soft)' }}
               >
                 <Plus className="w-3 h-3" />
                 {showNewType ? 'Cancel' : 'New Type'}
               </button>
             </div>
 
-            {/* Inline new type input */}
             {showNewType && (
               <div
                 className="flex items-center gap-2 p-3 rounded-xl border"
@@ -171,14 +163,12 @@ function CreateMaterialModal({
                 >
                   {savingType
                     ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    : <Check className="w-3.5 h-3.5" />
-                  }
+                    : <Check className="w-3.5 h-3.5" />}
                   {savingType ? '…' : 'Add'}
                 </button>
               </div>
             )}
 
-            {/* Type list — scrollable */}
             <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
               {types.map(opt => {
                 const isSelected = type === opt
@@ -193,17 +183,13 @@ function CreateMaterialModal({
                       borderColor : isSelected ? 'var(--accent)' : 'var(--border-dim)',
                     }}
                   >
-                    <span
-                      className="text-sm font-semibold flex-1"
-                      style={{ color: isSelected ? 'var(--accent)' : 'var(--text-primary)' }}
-                    >
+                    <span className="text-sm font-semibold flex-1"
+                      style={{ color: isSelected ? 'var(--accent)' : 'var(--text-primary)' }}>
                       {opt}
                     </span>
                     {isSelected && (
-                      <div
-                        className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
-                        style={{ background: 'var(--accent)' }}
-                      >
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
+                        style={{ background: 'var(--accent)' }}>
                         <Check className="w-3 h-3 text-black" />
                       </div>
                     )}
@@ -213,7 +199,6 @@ function CreateMaterialModal({
             </div>
           </div>
 
-          {/* Description */}
           <div className="space-y-2">
             <Label className="text-xs font-bold uppercase tracking-widest"
               style={{ color: 'var(--text-secondary)' }}>
@@ -239,7 +224,6 @@ function CreateMaterialModal({
             </p>
           )}
 
-          {/* Actions */}
           <div className="flex items-center gap-2 pt-1">
             <button
               onClick={handleConfirm}
@@ -273,7 +257,7 @@ function CreateMaterialModal({
   )
 }
 
-// ── Main InscanSection ─────────────────────────────────────────────────────
+// ── Main InscanSection ────────────────────────────────────────────────────────
 export default function InscanSection({
   vendors   : initialVendors,
   materials : initialMaterials,
@@ -297,22 +281,23 @@ export default function InscanSection({
     Object.fromEntries(initialMaterials.map(m => [m.id, m.type]))
   )
 
-  // Modal state
   const [pendingMaterialName, setPendingMaterialName] = useState<string | null>(null)
   const [pendingResolve,      setPendingResolve]      = useState<((opt: { id: string; label: string } | null) => void) | null>(null)
 
-  // Form state
-  const [selMaterial,  setSelMaterial]  = useState('')
-  const [materialType, setMaterialType] = useState('')
-  const [selVendor,    setSelVendor]    = useState('')
-  const [quantity,     setQuantity]     = useState('')
-  const [unitCost,     setUnitCost]     = useState('')
-  const [notes,        setNotes]        = useState('')
-  const [receivedAt,   setReceivedAt]   = useState<Date>(new Date())
-  const [calOpen,      setCalOpen]      = useState(false)
-  const [submitting,   setSubmitting]   = useState(false)
-  const [error,        setError]        = useState<string | null>(null)
-  const [success,      setSuccess]      = useState(false)
+  // ── Form state ──
+  const [selMaterial,    setSelMaterial]    = useState('')
+  const [materialType,   setMaterialType]   = useState('')
+  const [selVendor,      setSelVendor]      = useState('')
+  const [quantity,       setQuantity]       = useState('')
+  const [currency,       setCurrency]       = useState<'USD' | 'INR'>('USD')
+  const [unitCost,       setUnitCost]       = useState('')
+  const [customsPercent, setCustomsPercent] = useState('')
+  const [notes,          setNotes]          = useState('')
+  const [receivedAt,     setReceivedAt]     = useState<Date>(new Date())
+  const [calOpen,        setCalOpen]        = useState(false)
+  const [submitting,     setSubmitting]     = useState(false)
+  const [error,          setError]          = useState<string | null>(null)
+  const [success,        setSuccess]        = useState(false)
 
   const handleMaterialChange = (id: string) => {
     setSelMaterial(id)
@@ -365,6 +350,13 @@ export default function InscanSection({
     setPendingResolve(null)
   }
 
+  // ── Live cost preview ──
+  const cost         = parseFloat(unitCost || '0') || 0
+  const customs      = parseFloat(customsPercent || '0') || 0
+  const customsAmt   = cost * customs / 100
+  const landedCost   = cost + customsAmt
+  const totalCost    = landedCost * (parseInt(quantity) || 0)
+
   const handleSubmit = async () => {
     setError(null); setSuccess(false)
     if (!selMaterial) return setError('Please select or create a material.')
@@ -374,12 +366,14 @@ export default function InscanSection({
     setSubmitting(true)
     const sb = createClient()
     const { error: err } = await sb.from('stock_entries').insert({
-      material_id : selMaterial,
-      vendor_id   : selVendor,
-      quantity    : parseInt(quantity),
-      unit_cost   : unitCost ? parseFloat(unitCost) : null,
-      notes       : notes || null,
-      received_at : format(receivedAt, 'yyyy-MM-dd'),
+      material_id     : selMaterial,
+      vendor_id       : selVendor,
+      quantity        : parseInt(quantity),
+      unit_cost       : unitCost ? parseFloat(unitCost) : null,
+      currency        : currency,
+      customs_percent : customsPercent ? parseFloat(customsPercent) : 0,
+      notes           : notes || null,
+      received_at     : format(receivedAt, 'yyyy-MM-dd'),
     })
 
     if (err) {
@@ -389,6 +383,7 @@ export default function InscanSection({
 
     setSelMaterial(''); setSelVendor(''); setQuantity('')
     setUnitCost(''); setNotes(''); setMaterialType('')
+    setCurrency('USD'); setCustomsPercent('')
     setReceivedAt(new Date())
     setSuccess(true); setSubmitting(false)
     router.refresh()
@@ -401,9 +396,12 @@ export default function InscanSection({
     color       : 'var(--text-primary)',
   }
 
+  const fmtCost = (n: number) => currency === 'INR'
+    ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
+    : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 4 }).format(n)
+
   return (
     <>
-      {/* Create material modal */}
       {pendingMaterialName && (
         <CreateMaterialModal
           name={pendingMaterialName}
@@ -442,10 +440,9 @@ export default function InscanSection({
           </div>
         </div>
 
-        <div className="p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-5">
-
-            {/* Material */}
+        <div className="p-6 space-y-6">
+          {/* Row 1: Material, Type, Vendor */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase tracking-wider"
                 style={{ color: 'var(--text-secondary)' }}>
@@ -461,7 +458,6 @@ export default function InscanSection({
               />
             </div>
 
-            {/* Type — read only, auto filled */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase tracking-wider"
                 style={{ color: 'var(--text-secondary)' }}>
@@ -479,7 +475,6 @@ export default function InscanSection({
               </div>
             </div>
 
-            {/* Vendor */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase tracking-wider"
                 style={{ color: 'var(--text-secondary)' }}>
@@ -494,12 +489,14 @@ export default function InscanSection({
                 onCreate={handleCreateVendor}
               />
             </div>
+          </div>
 
-            {/* Quantity */}
+          {/* Row 2: Quantity, Currency, Unit Cost, Customs */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider"
                 style={{ color: 'var(--text-secondary)' }}>
-                <Hash className="w-3 h-3" /> Quantity (Units)
+                <Hash className="w-3 h-3" /> Quantity
               </Label>
               <Input
                 type="number" min={1} placeholder="e.g. 500"
@@ -509,21 +506,120 @@ export default function InscanSection({
               />
             </div>
 
-            {/* Unit cost */}
             <div className="space-y-2">
-              <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider"
+              <Label className="text-xs font-semibold uppercase tracking-wider"
                 style={{ color: 'var(--text-secondary)' }}>
-                <DollarSign className="w-3 h-3" /> Unit Cost (USD) — optional
+                Currency
               </Label>
-              <Input
-                type="number" min={0} placeholder="e.g. 1.85"
-                value={unitCost} onChange={e => setUnitCost(e.target.value)}
-                className="h-11 border rounded-lg text-sm"
-                style={inputStyle}
-              />
+              <div className="flex rounded-xl overflow-hidden border h-11"
+                style={{ borderColor: 'var(--border-dim)' }}>
+                {(['USD', 'INR'] as const).map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCurrency(c)}
+                    className="flex-1 text-sm font-bold transition-all"
+                    style={{
+                      background: currency === c ? 'var(--accent)' : 'var(--bg-input)',
+                      color     : currency === c ? '#fff' : 'var(--text-secondary)',
+                    }}
+                  >
+                    {c === 'USD' ? '$ USD' : '₹ INR'}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Received date */}
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider"
+                style={{ color: 'var(--text-secondary)' }}>
+                Unit Cost ({currency}) — optional
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold pointer-events-none"
+                  style={{ color: 'var(--text-dim)' }}>
+                  {currency === 'USD' ? '$' : '₹'}
+                </span>
+                <Input
+                  type="number" min={0} step="0.0001" placeholder="0.0000"
+                  value={unitCost} onChange={e => setUnitCost(e.target.value)}
+                  className="h-11 border rounded-lg text-sm pl-7"
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider"
+                style={{ color: 'var(--text-secondary)' }}>
+                Customs % — optional
+              </Label>
+              <div className="relative">
+                <Input
+                  type="number" min={0} max={200} step="0.1"
+                  placeholder="e.g. 20"
+                  value={customsPercent}
+                  onChange={e => setCustomsPercent(e.target.value)}
+                  className="h-11 border rounded-lg text-sm pr-8"
+                  style={inputStyle}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold pointer-events-none"
+                  style={{ color: 'var(--text-dim)' }}>%</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Live cost preview */}
+          {cost > 0 && (
+            <div
+              className="rounded-xl border p-4"
+              style={{ background: 'var(--bg-secondary)', borderColor: 'var(--accent-border)' }}
+            >
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-3"
+                style={{ color: 'var(--text-dim)' }}>
+                Cost Preview
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider mb-0.5"
+                    style={{ color: 'var(--text-secondary)' }}>Unit Cost</p>
+                  <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                    {fmtCost(cost)}
+                  </p>
+                </div>
+                {customs > 0 && (
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider mb-0.5"
+                      style={{ color: '#f59e0b' }}>Customs ({customs}%)</p>
+                    <p className="text-sm font-bold" style={{ color: '#f59e0b' }}>
+                      + {fmtCost(customsAmt)}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider mb-0.5"
+                    style={{ color: 'var(--text-secondary)' }}>Landed / unit</p>
+                  <p className="text-sm font-black" style={{ color: 'var(--accent)' }}>
+                    {fmtCost(landedCost)}
+                  </p>
+                </div>
+                {parseInt(quantity) > 0 && (
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider mb-0.5"
+                      style={{ color: 'var(--text-secondary)' }}>
+                      Total × {parseInt(quantity).toLocaleString()}
+                    </p>
+                    <p className="text-sm font-black" style={{ color: 'var(--accent)' }}>
+                      {fmtCost(totalCost)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Row 3: Received date + Notes */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider"
                 style={{ color: 'var(--text-secondary)' }}>
@@ -552,8 +648,7 @@ export default function InscanSection({
               </Popover>
             </div>
 
-            {/* Notes */}
-            <div className="space-y-2 sm:col-span-2 lg:col-span-3">
+            <div className="space-y-2">
               <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider"
                 style={{ color: 'var(--text-secondary)' }}>
                 <FileText className="w-3 h-3" /> Notes — optional
@@ -567,26 +662,25 @@ export default function InscanSection({
             </div>
           </div>
 
-          <div className="mt-6 border-t" style={{ borderColor: 'var(--border-dim)' }} />
+          <div className="border-t pt-4 flex items-center gap-3"
+            style={{ borderColor: 'var(--border-dim)' }}>
 
-          {error && (
-            <div className="mt-4 px-4 py-3 rounded-lg text-sm"
-              style={{ background: '#ef444410', border: '1px solid #ef444430', color: '#ef4444' }}>
-              ⚠ {error}
-            </div>
-          )}
-          {success && (
-            <div className="mt-4 px-4 py-3 rounded-lg text-sm"
-              style={{
-                background : 'color-mix(in srgb, var(--neon-green) 10%, transparent)',
-                border     : '1px solid color-mix(in srgb, var(--neon-green) 25%, transparent)',
-                color      : 'var(--neon-green)',
-              }}>
-              ✓ Stock inscanned successfully!
-            </div>
-          )}
+            {error && (
+              <p className="flex-1 text-sm px-4 py-2.5 rounded-lg"
+                style={{ background: '#ef444410', border: '1px solid #ef444430', color: '#ef4444' }}>
+                ⚠ {error}
+              </p>
+            )}
 
-          <div className="mt-4 flex items-center gap-3">
+            {success && (
+              <p className="flex-1 text-sm px-4 py-2.5 rounded-lg"
+                style={{ background: '#10b98110', border: '1px solid #10b98128', color: '#10b981' }}>
+                ✓ Stock inscanned successfully!
+              </p>
+            )}
+
+            {!error && !success && <div className="flex-1" />}
+
             <button
               onClick={handleSubmit}
               disabled={submitting}
@@ -595,12 +689,14 @@ export default function InscanSection({
             >
               {submitting ? 'Saving…' : '+ Inscan Stock'}
             </button>
+
             {(selMaterial || selVendor || quantity) && (
               <button
                 onClick={() => {
                   setSelMaterial(''); setSelVendor('')
                   setQuantity(''); setUnitCost('')
                   setNotes(''); setMaterialType('')
+                  setCurrency('USD'); setCustomsPercent('')
                 }}
                 className="px-4 py-2.5 rounded-lg text-sm font-medium border"
                 style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}

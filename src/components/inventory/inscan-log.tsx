@@ -15,35 +15,32 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import CreatableCombobox from '@/components/creatable-combobox'
 
 type InscanLogEntry = {
-  id           : string
-  material_id  : string
-  material_name: string
-  material_type: string
-  vendor_name  : string
-  quantity     : number
-  unit_cost    : number | null
-  notes        : string | null
-  received_at  : string
-  created_at   : string
+  id             : string
+  material_id    : string
+  material_name  : string
+  material_type  : string
+  vendor_name    : string
+  quantity       : number
+  unit_cost      : number | null
+  currency       : string | null
+  customs_percent: number | null
+  notes          : string | null
+  received_at    : string
+  created_at     : string
 }
 
 type EditState = {
-  id          : string
-  quantity    : string
-  unit_cost   : string
-  notes       : string
-  vendor_id   : string
-  received_at : Date
+  id             : string
+  quantity       : string
+  unit_cost      : string
+  currency       : 'USD' | 'INR'
+  customs_percent: string
+  notes          : string
+  vendor_id      : string
+  received_at    : Date
 }
 
 const PAGE_SIZE = 10
-
-const fmtUSD = (n: number) =>
-  new Intl.NumberFormat('en-US', {
-    style                : 'currency',
-    currency             : 'USD',
-    maximumFractionDigits: 2,
-  }).format(n)
 
 const TYPE_COLORS: Record<string, { color: string; bg: string }> = {
   'IC / Microcontroller' : { color: '#3b82f6', bg: '#3b82f610' },
@@ -53,6 +50,17 @@ const TYPE_COLORS: Record<string, { color: string; bg: string }> = {
   'Other'                : { color: '#6b7280', bg: '#6b728010' },
 }
 const DEFAULT_COLOR = { color: '#6b7280', bg: '#6b728010' }
+
+const fmtCost = (cost: number, currency: string | null) => {
+  if (currency === 'INR') {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency', currency: 'INR', maximumFractionDigits: 2,
+    }).format(cost)
+  }
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency', currency: 'USD', maximumFractionDigits: 4,
+  }).format(cost)
+}
 
 export default function InscanLog({
   logs    = [],
@@ -89,12 +97,14 @@ export default function InscanLog({
 
   const handleEdit = (log: InscanLogEntry) => {
     setEditing({
-      id          : log.id,
-      quantity    : String(log.quantity),
-      unit_cost   : log.unit_cost ? String(log.unit_cost) : '',
-      notes       : log.notes ?? '',
-      vendor_id   : getVendorId(log.vendor_name),
-      received_at : log.received_at ? parseISO(log.received_at) : new Date(),
+      id             : log.id,
+      quantity       : String(log.quantity),
+      unit_cost      : log.unit_cost ? String(log.unit_cost) : '',
+      currency       : (log.currency as 'USD' | 'INR') ?? 'USD',
+      customs_percent: log.customs_percent ? String(log.customs_percent) : '',
+      notes          : log.notes ?? '',
+      vendor_id      : getVendorId(log.vendor_name),
+      received_at    : log.received_at ? parseISO(log.received_at) : new Date(),
     })
   }
 
@@ -103,11 +113,13 @@ export default function InscanLog({
     setSaving(true)
     const sb = createClient()
     await sb.from('stock_entries').update({
-      quantity    : parseInt(editing.quantity),
-      unit_cost   : editing.unit_cost ? parseFloat(editing.unit_cost) : null,
-      notes       : editing.notes || null,
-      vendor_id   : editing.vendor_id || null,
-      received_at : format(editing.received_at, 'yyyy-MM-dd'),
+      quantity        : parseInt(editing.quantity),
+      unit_cost       : editing.unit_cost ? parseFloat(editing.unit_cost) : null,
+      currency        : editing.currency,
+      customs_percent : editing.customs_percent ? parseFloat(editing.customs_percent) : 0,
+      notes           : editing.notes || null,
+      vendor_id       : editing.vendor_id || null,
+      received_at     : format(editing.received_at, 'yyyy-MM-dd'),
     }).eq('id', editing.id)
     setSaving(false)
     setEditing(null)
@@ -139,6 +151,14 @@ export default function InscanLog({
     color       : 'var(--text-primary)',
   }
 
+  // ── Live cost preview ──
+  const previewCost = editing ? (() => {
+    const cost    = parseFloat(editing.unit_cost || '0') || 0
+    const customs = parseFloat(editing.customs_percent || '0') || 0
+    const costWithCustoms = cost + (cost * customs / 100)
+    return { cost, customs, costWithCustoms }
+  })() : null
+
   return (
     <>
       {/* ── Edit Modal ── */}
@@ -148,10 +168,11 @@ export default function InscanLog({
           style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
           onClick={e => { if (e.target === e.currentTarget) setEditing(null) }}
         >
-<div
-  className="w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden animate-fade-up max-h-[90vh] overflow-y-auto"
-  style={{ background: 'var(--bg-card)', borderColor: 'var(--accent-border)' }}
->
+          <div
+            className="w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--accent-border)' }}
+          >
+            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b"
               style={{ borderColor: 'var(--border-dim)', background: 'var(--accent-soft)' }}>
               <div>
@@ -169,18 +190,16 @@ export default function InscanLog({
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+
               {/* Quantity */}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wider"
                   style={{ color: 'var(--text-secondary)' }}>Quantity</Label>
-                <Input
-                  type="number" min={1}
+                <Input type="number" min={1}
                   value={editing.quantity}
                   onChange={e => setEditing(p => p && ({ ...p, quantity: e.target.value }))}
-                  className="h-11 border rounded-lg text-sm"
-                  style={inputStyle}
-                />
+                  className="h-11 border rounded-lg text-sm" style={inputStyle} />
               </div>
 
               {/* Vendor */}
@@ -197,18 +216,114 @@ export default function InscanLog({
                 />
               </div>
 
+              {/* Currency toggle */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: 'var(--text-secondary)' }}>Currency</Label>
+                <div className="flex rounded-xl overflow-hidden border"
+                  style={{ borderColor: 'var(--border-dim)' }}>
+                  {(['USD', 'INR'] as const).map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setEditing(p => p && ({ ...p, currency: c }))}
+                      className="flex-1 py-2.5 text-sm font-bold transition-all"
+                      style={{
+                        background: editing.currency === c ? 'var(--accent)' : 'var(--bg-input)',
+                        color     : editing.currency === c ? '#fff' : 'var(--text-secondary)',
+                      }}>
+                      {c === 'USD' ? '$ USD' : '₹ INR'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Unit cost */}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-secondary)' }}>Unit Cost (USD) — optional</Label>
-                <Input
-                  type="number" min={0} placeholder="e.g. 1.85"
-                  value={editing.unit_cost}
-                  onChange={e => setEditing(p => p && ({ ...p, unit_cost: e.target.value }))}
-                  className="h-11 border rounded-lg text-sm"
-                  style={inputStyle}
-                />
+                  style={{ color: 'var(--text-secondary)' }}>
+                  Unit Cost ({editing.currency}) — optional
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold pointer-events-none"
+                    style={{ color: 'var(--text-dim)' }}>
+                    {editing.currency === 'USD' ? '$' : '₹'}
+                  </span>
+                  <Input
+                    type="number" min={0} step="0.0001"
+                    placeholder="0.0000"
+                    value={editing.unit_cost}
+                    onChange={e => setEditing(p => p && ({ ...p, unit_cost: e.target.value }))}
+                    className="h-11 border rounded-lg text-sm pl-7"
+                    style={inputStyle}
+                  />
+                </div>
               </div>
+
+              {/* Customs % */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: 'var(--text-secondary)' }}>
+                  Customs / Import Duty — optional
+                </Label>
+                <div className="relative">
+                  <Input
+                    type="number" min={0} max={200} step="0.1"
+                    placeholder="e.g. 20"
+                    value={editing.customs_percent}
+                    onChange={e => setEditing(p => p && ({ ...p, customs_percent: e.target.value }))}
+                    className="h-11 border rounded-lg text-sm pr-8"
+                    style={inputStyle}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold pointer-events-none"
+                    style={{ color: 'var(--text-dim)' }}>%</span>
+                </div>
+              </div>
+
+              {/* Live cost preview */}
+              {previewCost && previewCost.cost > 0 && (
+                <div className="rounded-xl border p-3 space-y-2"
+                  style={{ background: 'var(--bg-secondary)', borderColor: 'var(--accent-border)' }}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider"
+                    style={{ color: 'var(--text-dim)' }}>Cost Preview</p>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span style={{ color: 'var(--text-secondary)' }}>Unit cost</span>
+                      <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        {fmtCost(previewCost.cost, editing.currency)}
+                      </span>
+                    </div>
+                    {previewCost.customs > 0 && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span style={{ color: '#f59e0b' }}>
+                          + Customs ({editing.customs_percent}%)
+                        </span>
+                        <span className="font-semibold" style={{ color: '#f59e0b' }}>
+                          {fmtCost(previewCost.cost * previewCost.customs / 100, editing.currency)}
+                        </span>
+                      </div>
+                    )}
+                    <div
+                      className="flex items-center justify-between text-xs pt-1.5 border-t"
+                      style={{ borderColor: 'var(--border-dim)' }}>
+                      <span className="font-bold" style={{ color: 'var(--text-primary)' }}>
+                        Landed cost / unit
+                      </span>
+                      <span className="font-black" style={{ color: 'var(--accent)' }}>
+                        {fmtCost(previewCost.costWithCustoms, editing.currency)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span style={{ color: 'var(--text-secondary)' }}>
+                        × {editing.quantity || 1} units
+                      </span>
+                      <span className="font-bold" style={{ color: 'var(--accent)' }}>
+                        {fmtCost(previewCost.costWithCustoms * (parseInt(editing.quantity) || 1), editing.currency)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Received date */}
               <div className="space-y-2">
@@ -299,10 +414,10 @@ export default function InscanLog({
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-secondary)' }}>
-                  {['Date Received', 'Material', 'Type', 'Vendor', 'Quantity', 'Unit Cost', 'Notes', ''].map((h, i) => (
+                  {['Date', 'Material', 'Type', 'Vendor', 'Qty', 'Unit Cost', 'Customs', 'Landed Cost', ''].map((h, i) => (
                     <th key={i}
-                      className={`py-3 px-5 text-[10px] font-bold uppercase tracking-widest ${
-                        i >= 4 && i <= 6 ? 'text-right' : 'text-left'
+                      className={`py-3 px-4 text-[10px] font-bold uppercase tracking-widest ${
+                        i >= 4 && i <= 7 ? 'text-right' : 'text-left'
                       }`}
                       style={{ color: 'var(--text-dim)' }}>
                       {h}
@@ -313,57 +428,86 @@ export default function InscanLog({
               <tbody>
                 {paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-16" style={{ color: 'var(--text-dim)' }}>
+                    <td colSpan={9} className="text-center py-16" style={{ color: 'var(--text-dim)' }}>
                       <PackagePlus className="w-8 h-8 mx-auto mb-3 opacity-40" />
                       <p className="text-sm">No inscan logs yet</p>
                     </td>
                   </tr>
                 ) : paginated.map(log => {
-                  const cfg = TYPE_COLORS[log.material_type] ?? DEFAULT_COLOR
+                  const cfg         = TYPE_COLORS[log.material_type] ?? DEFAULT_COLOR
+                  const customs     = log.customs_percent ?? 0
+                  const landedCost  = log.unit_cost
+                    ? log.unit_cost + (log.unit_cost * customs / 100)
+                    : null
+
                   return (
                     <tr key={log.id} className="transition-colors"
                       style={{ borderBottom: '1px solid var(--border-dim)' }}
                       onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-card-hover)'}
                       onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
 
-                      <td className="px-5 py-3.5 whitespace-nowrap text-sm"
+                      <td className="px-4 py-3.5 whitespace-nowrap text-sm"
                         style={{ color: 'var(--text-secondary)' }}>
                         {log.received_at ? format(new Date(log.received_at), 'dd MMM yyyy') : '—'}
                       </td>
 
-                      <td className="px-5 py-3.5">
+                      <td className="px-4 py-3.5">
                         <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
                           {log.material_name}
                         </p>
+                        {log.notes && (
+                          <p className="text-xs mt-0.5 truncate max-w-36"
+                            style={{ color: 'var(--text-dim)' }}>{log.notes}</p>
+                        )}
                       </td>
 
-                      <td className="px-5 py-3.5">
+                      <td className="px-4 py-3.5">
                         <span className="px-2 py-1 rounded-full text-xs font-medium"
                           style={{ background: cfg.bg, color: cfg.color }}>
                           {log.material_type}
                         </span>
                       </td>
 
-                      <td className="px-5 py-3.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      <td className="px-4 py-3.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
                         {log.vendor_name}
                       </td>
 
-                      <td className="px-5 py-3.5 text-right font-bold text-sm"
+                      <td className="px-4 py-3.5 text-right font-bold text-sm"
                         style={{ color: 'var(--accent)' }}>
                         +{log.quantity.toLocaleString()}
                       </td>
 
-                      <td className="px-5 py-3.5 text-right text-sm"
+                      <td className="px-4 py-3.5 text-right text-sm"
                         style={{ color: 'var(--text-secondary)' }}>
-                        {log.unit_cost ? fmtUSD(log.unit_cost) : '—'}
+                        {log.unit_cost
+                          ? fmtCost(log.unit_cost, log.currency)
+                          : <span style={{ color: 'var(--text-dim)' }}>—</span>}
                       </td>
 
-                      <td className="px-5 py-3.5 text-right text-sm"
-                        style={{ color: 'var(--text-dim)' }}>
-                        {log.notes ?? '—'}
+                      <td className="px-4 py-3.5 text-right text-sm">
+                        {customs > 0
+                          ? <span className="font-semibold" style={{ color: '#f59e0b' }}>
+                              {customs}%
+                            </span>
+                          : <span style={{ color: 'var(--text-dim)' }}>—</span>}
                       </td>
 
-                      <td className="px-5 py-3.5">
+                      <td className="px-4 py-3.5 text-right text-sm">
+                        {landedCost
+                          ? <div>
+                              <span className="font-bold" style={{ color: 'var(--text-primary)' }}>
+                                {fmtCost(landedCost, log.currency)}
+                              </span>
+                              {customs > 0 && (
+                                <div className="text-[10px]" style={{ color: '#f59e0b' }}>
+                                  incl. {customs}% customs
+                                </div>
+                              )}
+                            </div>
+                          : <span style={{ color: 'var(--text-dim)' }}>—</span>}
+                      </td>
+
+                      <td className="px-4 py-3.5">
                         <div className="flex items-center gap-1.5 justify-end">
                           <button onClick={() => handleEdit(log)}
                             className="w-7 h-7 rounded-lg flex items-center justify-center border transition-all"

@@ -35,28 +35,32 @@ export default async function InscanPage() {
     'Other',
   ]
 
-  const { data: inscanRows } = await supabase
-    .from('stock_entries')
-    .select(`
-      id, material_id, vendor_id, quantity, unit_cost, notes, received_at, created_at,
-      materials ( name, type ),
-      vendors   ( name )
-    `)
-    .order('received_at', { ascending: false })
-    .limit(100)
+const { data: inscanRows } = await supabase
+  .from('stock_entries')
+  .select(`
+    id, material_id, vendor_id, quantity, unit_cost,
+    currency, customs_percent,
+    notes, received_at, created_at,
+    materials ( name, type ),
+    vendors   ( name )
+  `)
+  .order('received_at', { ascending: false })
+  .limit(100)
 
-  const inscanLogs = ((inscanRows as unknown as InscanRow[]) ?? []).map(r => ({
-    id           : r.id,
-    material_id  : r.material_id,
-    material_name: r.materials?.name     ?? '—',
-    material_type: r.materials?.type     ?? '—',
-    vendor_name  : r.vendors?.name       ?? '—',
-    quantity     : r.quantity,
-    unit_cost    : r.unit_cost,
-    notes        : r.notes,
-    received_at  : r.received_at,
-    created_at   : r.created_at,
-  }))
+const inscanLogs = (inscanRows as any[] ?? []).map(r => ({
+  id             : r.id,
+  material_id    : r.material_id,
+  material_name  : r.materials?.name ?? '—',
+  material_type  : r.materials?.type ?? '—',
+  vendor_name    : r.vendors?.name   ?? '—',
+  quantity       : r.quantity,
+  unit_cost      : r.unit_cost,
+  currency       : r.currency       ?? 'USD',
+  customs_percent: r.customs_percent ?? 0,
+  notes          : r.notes,
+  received_at    : r.received_at,
+  created_at     : r.created_at,
+}))
 
   return (
     <div className="min-h-screen grid-bg animate-fade-up">

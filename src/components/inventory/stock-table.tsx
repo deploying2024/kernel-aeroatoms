@@ -31,19 +31,15 @@ const TYPE_CONFIG: Record<string, {
 }
 const DEFAULT_TYPE = TYPE_CONFIG['Other']
 
-const fmt = (n: number) =>
-  new Intl.NumberFormat('en-US', {
-    style                : 'currency',
-    currency             : 'USD',
-    maximumFractionDigits: 2,
-  }).format(n)
-
 type EditState = {
-  entry_id    : string
-  quantity    : string
-  vendor_id   : string
-  received_at : Date
-  notes       : string
+  entry_id       : string
+  quantity       : string
+  vendor_id      : string
+  received_at    : Date
+  notes          : string
+  unit_cost      : string
+  currency       : 'USD' | 'INR'
+  customs_percent: string
 }
 
 export default function StockTable({
@@ -110,11 +106,14 @@ export default function StockTable({
 
   const handleEdit = (s: StockEntry) => {
     setEditing({
-      entry_id    : s.entry_id,
-      quantity    : String(s.inscanned),
-      vendor_id   : s.vendor_id,
-      received_at : s.received_at ? parseISO(s.received_at) : new Date(),
-      notes       : s.notes ?? '',
+      entry_id       : s.entry_id,
+      quantity       : String(s.inscanned),
+      vendor_id      : s.vendor_id,
+      received_at    : s.received_at ? parseISO(s.received_at) : new Date(),
+      notes          : s.notes ?? '',
+      unit_cost      : s.unit_cost      ? String(s.unit_cost)      : '',
+      currency       : ((s as any).currency       as 'USD' | 'INR') ?? 'USD',
+      customs_percent: (s as any).customs_percent ? String((s as any).customs_percent) : '',
     })
   }
 
@@ -123,10 +122,13 @@ export default function StockTable({
     setSaving(true)
     const sb = createClient()
     await sb.from('stock_entries').update({
-      quantity    : parseInt(editing.quantity),
-      vendor_id   : editing.vendor_id,
-      received_at : format(editing.received_at, 'yyyy-MM-dd'),
-      notes       : editing.notes || null,
+      quantity        : parseInt(editing.quantity),
+      vendor_id       : editing.vendor_id,
+      received_at     : format(editing.received_at, 'yyyy-MM-dd'),
+      notes           : editing.notes || null,
+      unit_cost       : editing.unit_cost ? parseFloat(editing.unit_cost) : null,
+      currency        : editing.currency,
+      customs_percent : editing.customs_percent ? parseFloat(editing.customs_percent) : 0,
     }).eq('id', editing.entry_id)
     setSaving(false)
     setEditing(null)
@@ -160,7 +162,7 @@ export default function StockTable({
 
   return (
     <>
-      {/* Edit Modal */}
+      {/* ── Edit Modal ── */}
       {editing && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center px-4"
@@ -168,7 +170,7 @@ export default function StockTable({
           onClick={e => { if (e.target === e.currentTarget) setEditing(null) }}
         >
           <div
-            className="w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden animate-fade-up"
+            className="w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden"
             style={{ background: 'var(--bg-card)', borderColor: 'var(--accent-border)' }}
           >
             {/* Header */}
@@ -189,7 +191,8 @@ export default function StockTable({
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+
               {/* Quantity */}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wider"
@@ -217,22 +220,149 @@ export default function StockTable({
                 />
               </div>
 
+              {/* Currency toggle */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: 'var(--text-secondary)' }}>Currency</Label>
+                <div className="flex rounded-xl overflow-hidden border h-11"
+                  style={{ borderColor: 'var(--border-dim)' }}>
+                  {(['USD', 'INR'] as const).map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setEditing(p => p && ({ ...p, currency: c }))}
+                      className="flex-1 text-sm font-bold transition-all"
+                      style={{
+                        background: editing.currency === c ? 'var(--accent)' : 'var(--bg-input)',
+                        color     : editing.currency === c ? '#fff' : 'var(--text-secondary)',
+                      }}>
+                      {c === 'USD' ? '$ USD' : '₹ INR'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Unit cost */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: 'var(--text-secondary)' }}>
+                  Unit Cost ({editing.currency}) — optional
+                </Label>
+                <div className="relative">
+                  <span
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold pointer-events-none"
+                    style={{ color: 'var(--text-dim)' }}>
+                    {editing.currency === 'USD' ? '$' : '₹'}
+                  </span>
+                  <Input
+                    type="number" min={0} step="0.0001"
+                    placeholder="0.0000"
+                    value={editing.unit_cost}
+                    onChange={e => setEditing(p => p && ({ ...p, unit_cost: e.target.value }))}
+                    className="h-11 border rounded-lg text-sm pl-7"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              {/* Customs % */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: 'var(--text-secondary)' }}>
+                  Customs / Import Duty — optional
+                </Label>
+                <div className="relative">
+                  <Input
+                    type="number" min={0} max={200} step="0.1"
+                    placeholder="e.g. 20"
+                    value={editing.customs_percent}
+                    onChange={e => setEditing(p => p && ({ ...p, customs_percent: e.target.value }))}
+                    className="h-11 border rounded-lg text-sm pr-8"
+                    style={inputStyle}
+                  />
+                  <span
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold pointer-events-none"
+                    style={{ color: 'var(--text-dim)' }}>%</span>
+                </div>
+              </div>
+
+              {/* Live cost preview */}
+              {(() => {
+                const cost       = parseFloat(editing.unit_cost || '0') || 0
+                const customs    = parseFloat(editing.customs_percent || '0') || 0
+                const customsAmt = cost * customs / 100
+                const landed     = cost + customsAmt
+                const total      = landed * (parseInt(editing.quantity) || 0)
+                if (cost <= 0) return null
+                const fmt = (n: number) => editing.currency === 'INR'
+                  ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
+                  : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 4 }).format(n)
+                return (
+                  <div className="rounded-xl border p-3 space-y-2"
+                    style={{ background: 'var(--bg-secondary)', borderColor: 'var(--accent-border)' }}>
+                    <p className="text-[10px] font-bold uppercase tracking-wider"
+                      style={{ color: 'var(--text-dim)' }}>Cost Preview</p>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs">
+                        <span style={{ color: 'var(--text-secondary)' }}>Unit cost</span>
+                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          {fmt(cost)}
+                        </span>
+                      </div>
+                      {customs > 0 && (
+                        <div className="flex justify-between text-xs">
+                          <span style={{ color: '#f59e0b' }}>+ Customs ({customs}%)</span>
+                          <span className="font-semibold" style={{ color: '#f59e0b' }}>
+                            {fmt(customsAmt)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-xs pt-1.5 border-t"
+                        style={{ borderColor: 'var(--border-dim)' }}>
+                        <span className="font-bold" style={{ color: 'var(--text-primary)' }}>
+                          Landed / unit
+                        </span>
+                        <span className="font-black" style={{ color: 'var(--accent)' }}>
+                          {fmt(landed)}
+                        </span>
+                      </div>
+                      {parseInt(editing.quantity) > 0 && (
+                        <div className="flex justify-between text-xs">
+                          <span style={{ color: 'var(--text-secondary)' }}>
+                            × {parseInt(editing.quantity).toLocaleString()} units
+                          </span>
+                          <span className="font-bold" style={{ color: 'var(--accent)' }}>
+                            {fmt(total)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* Received date */}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wider"
                   style={{ color: 'var(--text-secondary)' }}>Received Date</Label>
                 <Popover open={calOpen} onOpenChange={setCalOpen}>
                   <PopoverTrigger asChild>
-                    <button className="flex items-center gap-2 w-full h-11 px-3 border rounded-lg text-sm"
+                    <button
+                      className="flex items-center gap-2 w-full h-11 px-3 border rounded-lg text-sm"
                       style={inputStyle}>
                       {format(editing.received_at, 'dd MMM yyyy')}
                     </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0"
                     style={{ background: 'var(--bg-card)', borderColor: 'var(--border-dim)' }}>
-                    <Calendar mode="single" selected={editing.received_at}
-                      onSelect={d => { if (d) { setEditing(p => p && ({ ...p, received_at: d })); setCalOpen(false) } }}
-                      initialFocus />
+                    <Calendar
+                      mode="single"
+                      selected={editing.received_at}
+                      onSelect={d => {
+                        if (d) { setEditing(p => p && ({ ...p, received_at: d })); setCalOpen(false) }
+                      }}
+                      initialFocus
+                    />
                   </PopoverContent>
                 </Popover>
               </div>
@@ -240,7 +370,7 @@ export default function StockTable({
               {/* Notes */}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-secondary)' }}>Notes</Label>
+                  style={{ color: 'var(--text-secondary)' }}>Notes — optional</Label>
                 <Input
                   placeholder="e.g. Batch A, invoice #1234"
                   value={editing.notes}
@@ -253,18 +383,69 @@ export default function StockTable({
               {/* Actions */}
               <div className="flex items-center gap-3 pt-2 border-t"
                 style={{ borderColor: 'var(--border-dim)' }}>
-                <button onClick={handleSave} disabled={saving}
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50"
                   style={{ background: 'var(--accent)', color: '#fff' }}>
                   <Check className="w-4 h-4" />
                   {saving ? 'Saving…' : 'Save Changes'}
                 </button>
-                <button onClick={() => setEditing(null)}
+                <button
+                  onClick={() => setEditing(null)}
                   className="px-4 py-2.5 rounded-lg text-sm border"
                   style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Confirm Modal ── */}
+      {confirmDel && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+          onClick={e => { if (e.target === e.currentTarget) setConfirmDel(null) }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border shadow-2xl overflow-hidden"
+            style={{ background: 'var(--bg-card)', borderColor: '#ef444430' }}
+          >
+            <div className="px-6 py-5 border-b"
+              style={{ borderColor: 'var(--border-dim)', background: '#ef444408' }}>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                  style={{ background: '#ef444415', border: '1px solid #ef444430' }}>
+                  <Trash2 className="w-4 h-4" style={{ color: '#ef4444' }} />
+                </div>
+                <p className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+                  Delete Entry?
+                </p>
+              </div>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                This will permanently delete this inscan batch and all its outscan records.
+              </p>
+              <p className="text-xs mt-2" style={{ color: '#ef4444' }}>⚠ Cannot be undone.</p>
+            </div>
+            <div className="flex gap-3 px-6 py-4">
+              <button
+                onClick={() => handleDelete(confirmDel)}
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ background: '#ef4444', color: '#fff' }}>
+                {deleting
+                  ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Deleting…</>
+                  : <><Trash2 className="w-4 h-4" /> Yes, Delete</>}
+              </button>
+              <button
+                onClick={() => setConfirmDel(null)}
+                className="flex-1 py-2.5 rounded-lg text-sm font-medium border"
+                style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
+                Cancel
+              </button>
             </div>
           </div>
         </div>
@@ -290,9 +471,13 @@ export default function StockTable({
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5"
               style={{ color: 'var(--text-dim)' }} />
-            <Input placeholder="Search material or vendor…" value={search}
+            <Input
+              placeholder="Search material or vendor…"
+              value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-9 h-9 text-sm border rounded-lg" style={inputStyle} />
+              className="pl-9 h-9 text-sm border rounded-lg"
+              style={inputStyle}
+            />
           </div>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="h-9 text-sm border rounded-lg w-full sm:w-56" style={inputStyle}>
@@ -311,7 +496,8 @@ export default function StockTable({
         {cards.length === 0 && (
           <div className="rounded-2xl border py-20 text-center"
             style={{ background: 'var(--bg-card)', borderColor: 'var(--border-dim)' }}>
-            <Layers className="w-10 h-10 mx-auto mb-3 opacity-20" style={{ color: 'var(--text-primary)' }} />
+            <Layers className="w-10 h-10 mx-auto mb-3 opacity-20"
+              style={{ color: 'var(--text-primary)' }} />
             <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
               No stock entries yet
             </p>
@@ -329,24 +515,28 @@ export default function StockTable({
             const isEmpty = card.total_remaining === 0
 
             return (
-              <div key={card.material_id}
+              <div
+                key={card.material_id}
                 className="relative rounded-2xl border overflow-hidden"
                 style={{ background: 'var(--bg-card)', borderColor: cfg.border, boxShadow: cfg.glow }}>
 
                 <div className="h-1 w-full"
                   style={{ background: `linear-gradient(90deg, ${cfg.color}, transparent)` }} />
-                <div className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl opacity-10 pointer-events-none"
+                <div
+                  className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl opacity-10 pointer-events-none"
                   style={{ background: cfg.color }} />
 
                 <div className="p-5">
                   {/* Type + low stock */}
                   <div className="flex items-center justify-between mb-4">
-                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                    <span
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
                       style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}>
                       {cfg.icon} {card.material_type}
                     </span>
                     {(isLow || isEmpty) && (
-                      <span className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold"
+                      <span
+                        className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold"
                         style={{ background: '#ef444415', color: '#ef4444', border: '1px solid #ef444430' }}>
                         <TrendingDown className="w-3 h-3" />
                         {isEmpty ? 'OUT OF STOCK' : 'LOW'}
@@ -355,7 +545,8 @@ export default function StockTable({
                   </div>
 
                   {/* Name */}
-                  <h3 className="font-bold text-base leading-tight mb-1 truncate"
+                  <h3
+                    className="font-bold text-base leading-tight mb-1 truncate"
                     style={{ color: 'var(--text-primary)' }}>
                     {card.material_name}
                   </h3>
@@ -370,7 +561,8 @@ export default function StockTable({
                     <p className="text-xs font-semibold uppercase tracking-widest mb-1"
                       style={{ color: 'var(--text-secondary)' }}>Remaining Stock</p>
                     <div className="flex items-end gap-2">
-                      <span className="text-4xl font-black tracking-tight leading-none"
+                      <span
+                        className="text-4xl font-black tracking-tight leading-none"
                         style={{ color: isEmpty ? '#ef4444' : isLow ? '#f59e0b' : cfg.color }}>
                         {card.total_remaining.toLocaleString()}
                       </span>
@@ -380,97 +572,127 @@ export default function StockTable({
                     </div>
                     <div className="mt-3 h-1.5 rounded-full overflow-hidden"
                       style={{ background: 'var(--border-dim)' }}>
-                      <div className="h-full rounded-full transition-all duration-700"
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
                         style={{
-                          width      : `${card.total_inscanned > 0 ? Math.min((card.total_remaining / card.total_inscanned) * 100, 100) : 0}%`,
-                          background : isEmpty ? '#ef4444' : isLow ? 'linear-gradient(90deg,#f59e0b,#ef4444)' : `linear-gradient(90deg,${cfg.color},${cfg.color}88)`,
+                          width     : `${card.total_inscanned > 0 ? Math.min((card.total_remaining / card.total_inscanned) * 100, 100) : 0}%`,
+                          background: isEmpty
+                            ? '#ef4444'
+                            : isLow
+                            ? 'linear-gradient(90deg,#f59e0b,#ef4444)'
+                            : `linear-gradient(90deg,${cfg.color},${cfg.color}88)`,
                         }} />
                     </div>
                   </div>
 
-                  {/* Vendor batches with edit/delete */}
+                  {/* Vendor batches */}
                   {card.entries.length > 0 && (
-                    <div className="rounded-xl p-3 space-y-2"
+                    <div
+                      className="rounded-xl p-3 space-y-2"
                       style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-dim)' }}>
                       <p className="text-[10px] font-bold uppercase tracking-widest"
                         style={{ color: 'var(--text-dim)' }}>Vendor Batches</p>
-                      {card.entries.map(entry => (
-                        <div key={entry.entry_id}
-                          className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <div className="w-1.5 h-1.5 rounded-full shrink-0"
-                              style={{ background: cfg.color }} />
-                            <div className="min-w-0">
-                              <span className="text-xs truncate block"
-                                style={{ color: 'var(--text-secondary)' }}>
-                                {entry.vendor_name}
-                              </span>
-                              {entry.received_at && (
-                                <span className="text-[10px]" style={{ color: 'var(--text-dim)' }}>
-                                  {format(new Date(entry.received_at), 'dd MMM yy')}
-                                  {entry.notes && ` · ${entry.notes}`}
-                                </span>
-                              )}
+                      {card.entries.map(entry => {
+                        const unitCost       = (entry as any).unit_cost
+                        const currency       = (entry as any).currency ?? 'USD'
+                        const customsPct     = (entry as any).customs_percent ?? 0
+                        const landedCost     = unitCost
+                          ? unitCost + (unitCost * customsPct / 100)
+                          : null
+                        const fmtCost = (n: number) => currency === 'INR'
+                          ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
+                          : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 4 }).format(n)
+
+                        return (
+                          <div key={entry.entry_id}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <div className="w-1.5 h-1.5 rounded-full shrink-0"
+                                  style={{ background: cfg.color }} />
+                                <div className="min-w-0">
+                                  <span className="text-xs truncate block"
+                                    style={{ color: 'var(--text-secondary)' }}>
+                                    {entry.vendor_name}
+                                  </span>
+                                  {entry.received_at && (
+                                    <span className="text-[10px]" style={{ color: 'var(--text-dim)' }}>
+                                      {format(new Date(entry.received_at), 'dd MMM yy')}
+                                      {entry.notes && ` · ${entry.notes}`}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <div className="text-right">
+                                  <span className="text-xs font-bold block"
+                                    style={{ color: entry.remaining <= 0 ? '#ef4444' : cfg.color }}>
+                                    {entry.remaining.toLocaleString()} left
+                                  </span>
+                                  {landedCost && (
+                                    <span className="text-[10px]" style={{ color: 'var(--text-dim)' }}>
+                                      {fmtCost(landedCost)}/unit
+                                      {customsPct > 0 && (
+                                        <span style={{ color: '#f59e0b' }}> +{customsPct}%</span>
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Edit */}
+                                <button
+                                  onClick={() => handleEdit(entry)}
+                                  className="w-6 h-6 rounded-md flex items-center justify-center border transition-all"
+                                  style={{ borderColor: 'var(--border-dim)', color: 'var(--text-dim)' }}
+                                  onMouseEnter={e => {
+                                    ;(e.currentTarget as HTMLElement).style.color = 'var(--accent)'
+                                    ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--accent-border)'
+                                  }}
+                                  onMouseLeave={e => {
+                                    ;(e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'
+                                    ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-dim)'
+                                  }}>
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+
+                                {/* Delete */}
+                                {confirmDel === entry.entry_id ? (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => handleDelete(entry.entry_id)}
+                                      disabled={deleting}
+                                      className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                                      style={{ background: '#ef4444', color: '#fff' }}>
+                                      {deleting ? '…' : 'Yes'}
+                                    </button>
+                                    <button
+                                      onClick={() => setConfirmDel(null)}
+                                      className="px-1.5 py-0.5 rounded text-[10px] border"
+                                      style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
+                                      No
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => setConfirmDel(entry.entry_id)}
+                                    className="w-6 h-6 rounded-md flex items-center justify-center border transition-all"
+                                    style={{ borderColor: 'var(--border-dim)', color: 'var(--text-dim)' }}
+                                    onMouseEnter={e => {
+                                      ;(e.currentTarget as HTMLElement).style.color = '#ef4444'
+                                      ;(e.currentTarget as HTMLElement).style.borderColor = '#ef444430'
+                                    }}
+                                    onMouseLeave={e => {
+                                      ;(e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'
+                                      ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-dim)'
+                                    }}>
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-xs font-bold"
-                              style={{ color: entry.remaining <= 0 ? '#ef4444' : cfg.color }}>
-                              {entry.remaining.toLocaleString()} left
-                            </span>
-                            {/* Edit */}
-                            <button
-                              onClick={() => handleEdit(entry)}
-                              className="w-6 h-6 rounded-md flex items-center justify-center border transition-all"
-                              style={{ borderColor: 'var(--border-dim)', color: 'var(--text-dim)' }}
-                              onMouseEnter={e => {
-                                ;(e.currentTarget as HTMLElement).style.color = 'var(--accent)'
-                                ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--accent-border)'
-                              }}
-                              onMouseLeave={e => {
-                                ;(e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'
-                                ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-dim)'
-                              }}
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                            {/* Delete */}
-                            {confirmDel === entry.entry_id ? (
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => handleDelete(entry.entry_id)}
-                                  disabled={deleting}
-                                  className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
-                                  style={{ background: '#ef4444', color: '#fff' }}>
-                                  {deleting ? '…' : 'Yes'}
-                                </button>
-                                <button
-                                  onClick={() => setConfirmDel(null)}
-                                  className="px-1.5 py-0.5 rounded text-[10px] border"
-                                  style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
-                                  No
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => setConfirmDel(entry.entry_id)}
-                                className="w-6 h-6 rounded-md flex items-center justify-center border transition-all"
-                                style={{ borderColor: 'var(--border-dim)', color: 'var(--text-dim)' }}
-                                onMouseEnter={e => {
-                                  ;(e.currentTarget as HTMLElement).style.color = '#ef4444'
-                                  ;(e.currentTarget as HTMLElement).style.borderColor = '#ef444430'
-                                }}
-                                onMouseLeave={e => {
-                                  ;(e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'
-                                  ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-dim)'
-                                }}
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </div>

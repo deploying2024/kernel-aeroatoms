@@ -150,4 +150,9 @@ export type CostSheetOnetime = {
   amount        : number
   currency      : 'INR' | 'USD'
   sort_order    : number
+
+  // Add to StockEntry type:
+unit_cost      ?: number | null
+//currency       ?: string | null
+customs_percent?: number | null
 }
