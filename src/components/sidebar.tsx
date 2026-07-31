@@ -9,7 +9,7 @@ import {
   PackageMinus, BarChart3, Gauge, Truck,
   Calculator, LogOut, Plane,
   ChevronLeft, ChevronRight, Menu, X,
-  Sun, Moon,FileText,ScanLine,
+  Sun, Moon,FileText,ScanLine, Boxes,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTheme } from 'next-themes'
@@ -21,6 +21,7 @@ const navItems = [
   { label: 'Inscan',          href: '/inscan',            icon: PackagePlus     },
   { label: 'Outscan',         href: '/outscan',           icon: PackageMinus    },
   { label: 'Inventory Value', href: '/inventory-value',   icon: BarChart3       },
+  { label: 'Product Stock', href: '/product-stock', icon: Boxes },
   { label: 'Yield Rate',      href: '/yield-rate',        icon: Gauge           },
   { label: 'Cost Price',      href: '/cost-price',        icon: Calculator      },
   { label: 'Generate Invoice', href: '/commercial-invoice', icon: FileText },
