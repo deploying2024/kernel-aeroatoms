@@ -15,7 +15,8 @@ type Product = {
   name           : string
   sku            : string
   unit_price     : number
-  stock_qty      : number
+  produced_qty   : number
+  stock_qty      : number   // available = produced - sold
   avg_sell_price : number
   stock_value_inr: number
   stock_value_usd: number
@@ -25,6 +26,17 @@ type Product = {
   updated_at     : string
 }
 
+// ── Formatters ─────────────────────────────────────────────────────────────────
+const fmtINR = (n: number) =>
+  new Intl.NumberFormat('en-IN', {
+    style: 'currency', currency: 'INR', maximumFractionDigits: 0,
+  }).format(n)
+
+const fmtUSD = (n: number) =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency', currency: 'USD', maximumFractionDigits: 2,
+  }).format(n)
+
 // ── Edit Modal ─────────────────────────────────────────────────────────────────
 function EditModal({
   product, onClose, onSaved,
@@ -33,7 +45,7 @@ function EditModal({
   onClose: () => void
   onSaved: () => void
 }) {
-  const [qty,    setQty]    = useState(String(product.stock_qty))
+  const [qty,    setQty]    = useState(String(product.produced_qty))
   const [price,  setPrice]  = useState(product.avg_sell_price > 0 ? String(product.avg_sell_price) : '')
   const [notes,  setNotes]  = useState(product.notes ?? '')
   const [mode,   setMode]   = useState<'set' | 'add' | 'sub'>('set')
@@ -41,30 +53,34 @@ function EditModal({
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
 
-  const finalQty = mode === 'set'
-    ? parseInt(qty) || 0
+  // Final produced qty after edit
+  const finalProduced = mode === 'set'
+    ? (parseInt(qty) || 0)
     : mode === 'add'
-    ? product.stock_qty + (parseInt(adjQty) || 0)
-    : Math.max(0, product.stock_qty - (parseInt(adjQty) || 0))
+    ? product.produced_qty + (parseInt(adjQty) || 0)
+    : Math.max(0, product.produced_qty - (parseInt(adjQty) || 0))
 
-  const previewValue = finalQty * (parseFloat(price || '0') || product.avg_sell_price)
+  // Available after sales
+  const finalAvailable = Math.max(0, finalProduced - product.total_sold)
+  const previewValue   = finalAvailable * (parseFloat(price || '0') || product.avg_sell_price)
 
   const handleSave = async () => {
     setError(null)
-    if (finalQty < 0) return setError('Quantity cannot be negative.')
+    if (finalProduced < 0) return setError('Quantity cannot be negative.')
     setSaving(true)
     const { error: err } = await createClient()
       .from('product_stock')
       .upsert({
-        product_id     : product.id,
-        quantity       : finalQty,
-        avg_sell_price : parseFloat(price || '0') || 0,
-        notes          : notes.trim() || null,
-        updated_at     : new Date().toISOString(),
+        product_id    : product.id,
+        quantity      : finalProduced,
+        avg_sell_price: parseFloat(price || '0') || 0,
+        notes         : notes.trim() || null,
+        updated_at    : new Date().toISOString(),
       }, { onConflict: 'product_id' })
     setSaving(false)
     if (err) return setError(err.message)
-    onSaved(); onClose()
+    onSaved()
+    onClose()
   }
 
   const inputStyle = {
@@ -73,9 +89,6 @@ function EditModal({
     color      : 'var(--text-primary)',
   }
 
-  const fmtINR = (n: number) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
@@ -83,11 +96,16 @@ function EditModal({
       <div className="w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden"
         style={{ background: 'var(--bg-card)', borderColor: 'var(--accent-border)' }}>
 
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b"
           style={{ borderColor: 'var(--border-dim)', background: 'var(--accent-soft)' }}>
           <div>
-            <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Update Stock</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{product.name}</p>
+            <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
+              Update Stock
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+              {product.name}
+            </p>
           </div>
           <button onClick={onClose}
             className="w-8 h-8 rounded-lg flex items-center justify-center border"
@@ -98,36 +116,47 @@ function EditModal({
 
         <div className="p-6 space-y-5">
 
-          {/* Current → After */}
-          <div className="flex items-center gap-3 p-3 rounded-xl"
+          {/* Produced / Sold / Available preview */}
+          <div className="grid grid-cols-3 gap-2 p-3 rounded-xl"
             style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-dim)' }}>
-            <div className="text-center flex-1">
-              <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Current</p>
+            <div className="text-center">
+              <p className="text-[10px] uppercase tracking-wider mb-1"
+                style={{ color: 'var(--text-secondary)' }}>Produced</p>
               <p className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>
-                {product.stock_qty}
+                {finalProduced}
               </p>
             </div>
-            <ArrowLeftRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-dim)' }} />
-            <div className="text-center flex-1">
-              <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>After</p>
-              <p className="text-2xl font-black"
-                style={{ color: finalQty !== product.stock_qty ? '#10b981' : 'var(--accent)' }}>
-                {finalQty}
+            <div className="text-center border-x" style={{ borderColor: 'var(--border-dim)' }}>
+              <p className="text-[10px] uppercase tracking-wider mb-1"
+                style={{ color: '#f59e0b' }}>Sold</p>
+              <p className="text-2xl font-black" style={{ color: '#f59e0b' }}>
+                {product.total_sold}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] uppercase tracking-wider mb-1"
+                style={{ color: '#10b981' }}>Available</p>
+              <p className="text-2xl font-black" style={{ color: '#10b981' }}>
+                {finalAvailable}
               </p>
             </div>
           </div>
 
-          {/* Mode */}
+          {/* Mode selector */}
           <div className="space-y-2">
             <Label className="text-xs font-semibold uppercase tracking-wider"
-              style={{ color: 'var(--text-secondary)' }}>Update Mode</Label>
-            <div className="flex rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border-dim)' }}>
+              style={{ color: 'var(--text-secondary)' }}>
+              Update Produced Qty
+            </Label>
+            <div className="flex rounded-xl overflow-hidden border"
+              style={{ borderColor: 'var(--border-dim)' }}>
               {([
-                { key: 'set', label: 'Set',      icon: <Package className="w-3.5 h-3.5" /> },
-                { key: 'add', label: 'Add +',    icon: <Plus className="w-3.5 h-3.5" /> },
-                { key: 'sub', label: 'Remove -', icon: <Minus className="w-3.5 h-3.5" /> },
+                { key: 'set', label: 'Set',       icon: <Package className="w-3.5 h-3.5" /> },
+                { key: 'add', label: 'Add +',     icon: <Plus    className="w-3.5 h-3.5" /> },
+                { key: 'sub', label: 'Remove −',  icon: <Minus   className="w-3.5 h-3.5" /> },
               ] as const).map(m => (
-                <button key={m.key} type="button" onClick={() => setMode(m.key)}
+                <button key={m.key} type="button"
+                  onClick={() => { setMode(m.key); setAdjQty('') }}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-all"
                   style={{
                     background: mode === m.key ? 'var(--accent)' : 'var(--bg-input)',
@@ -143,27 +172,36 @@ function EditModal({
           <div className="space-y-2">
             <Label className="text-xs font-semibold uppercase tracking-wider"
               style={{ color: 'var(--text-secondary)' }}>
-              {mode === 'set' ? 'Set Quantity' : mode === 'add' ? 'Units to Add' : 'Units to Remove'}
+              {mode === 'set'
+                ? 'Total Produced / Manufactured'
+                : mode === 'add' ? 'Units Produced (to add)'
+                : 'Units to Remove'}
             </Label>
-            <Input type="number" min={0} placeholder="e.g. 10"
+            <Input
+              type="number" min={0} placeholder="e.g. 10"
               value={mode === 'set' ? qty : adjQty}
               onChange={e => mode === 'set' ? setQty(e.target.value) : setAdjQty(e.target.value)}
-              className="h-11 border rounded-lg text-sm" style={inputStyle} />
+              className="h-11 border rounded-lg text-sm"
+              style={inputStyle}
+            />
           </div>
 
-          {/* Avg sell price — always INR since orders are INR */}
+          {/* Avg sell price */}
           <div className="space-y-2">
             <Label className="text-xs font-semibold uppercase tracking-wider"
               style={{ color: 'var(--text-secondary)' }}>
-              Avg Selling Price (₹) — for inventory value
+              Avg Selling Price (₹) — for stock value
             </Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold pointer-events-none"
                 style={{ color: 'var(--text-dim)' }}>₹</span>
               <Input type="number" min={0} step="0.01"
                 placeholder={String(product.unit_price || '0')}
-                value={price} onChange={e => setPrice(e.target.value)}
-                className="h-11 border rounded-lg text-sm pl-7" style={inputStyle} />
+                value={price}
+                onChange={e => setPrice(e.target.value)}
+                className="h-11 border rounded-lg text-sm pl-7"
+                style={inputStyle}
+              />
             </div>
             {product.total_sold > 0 && (
               <p className="text-xs" style={{ color: 'var(--text-dim)' }}>
@@ -172,11 +210,13 @@ function EditModal({
             )}
           </div>
 
-          {/* Value preview */}
-          {previewValue > 0 && finalQty > 0 && (
+          {/* Stock value preview */}
+          {previewValue > 0 && finalAvailable > 0 && (
             <div className="rounded-xl p-3 flex items-center justify-between"
               style={{ background: 'var(--bg-secondary)', border: '1px solid var(--accent-border)' }}>
-              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Stock Value after update</p>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                Stock value ({finalAvailable} available)
+              </p>
               <p className="text-base font-black" style={{ color: 'var(--accent)' }}>
                 {fmtINR(previewValue)}
               </p>
@@ -187,9 +227,13 @@ function EditModal({
           <div className="space-y-2">
             <Label className="text-xs font-semibold uppercase tracking-wider"
               style={{ color: 'var(--text-secondary)' }}>Notes — optional</Label>
-            <Input placeholder="e.g. Batch 2, production run Apr 2026"
-              value={notes} onChange={e => setNotes(e.target.value)}
-              className="h-10 border rounded-lg text-sm" style={inputStyle} />
+            <Input
+              placeholder="e.g. Batch 2, production run Apr 2026"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              className="h-10 border rounded-lg text-sm"
+              style={inputStyle}
+            />
           </div>
 
           {error && (
@@ -206,7 +250,8 @@ function EditModal({
               <Save className="w-4 h-4" />
               {saving ? 'Saving…' : 'Save'}
             </button>
-            <button onClick={onClose} className="px-4 py-2.5 rounded-lg text-sm border"
+            <button onClick={onClose}
+              className="px-4 py-2.5 rounded-lg text-sm border"
               style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
               Cancel
             </button>
@@ -232,16 +277,12 @@ function ProductTile({
   const statusColor = isEmpty ? '#ef4444' : isLow ? '#f59e0b' : '#10b981'
   const statusLabel = isEmpty ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock'
 
-  const fmtINR = (n: number) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
-  const fmtUSD = (n: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n)
+  const fmt      = (inr: number) => currency === 'INR' ? fmtINR(inr) : fmtUSD(inr * usdRate)
+  const symbol   = currency === 'INR' ? '₹' : '$'
 
-  const stockValue   = currency === 'INR' ? product.stock_value_inr : product.stock_value_usd
-  const avgPrice     = currency === 'INR' ? product.avg_sell_price  : product.avg_sell_price * usdRate
-  const revenue      = currency === 'INR' ? product.total_revenue   : product.total_revenue * usdRate
-  const fmtVal       = (n: number) => currency === 'INR' ? fmtINR(n) : fmtUSD(n)
-  const symbol       = currency === 'INR' ? '₹' : '$'
+  const avgPrice   = currency === 'INR' ? product.avg_sell_price : product.avg_sell_price * usdRate
+  const stockVal   = currency === 'INR' ? product.stock_value_inr : product.stock_value_usd
+  const revenue    = currency === 'INR' ? product.total_revenue : product.total_revenue * usdRate
 
   return (
     <div
@@ -255,13 +296,14 @@ function ProductTile({
       onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'}
       onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'}
     >
+      {/* Status bar */}
       <div className="h-1" style={{
         background: `linear-gradient(90deg, ${statusColor}, ${statusColor}44)`,
       }} />
 
       <div className="p-4 flex flex-col gap-3 flex-1">
 
-        {/* Header */}
+        {/* Name + edit */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="font-bold text-sm leading-tight truncate"
@@ -274,7 +316,8 @@ function ProductTile({
               </p>
             )}
           </div>
-          <button onClick={onEdit}
+          <button
+            onClick={onEdit}
             className="w-7 h-7 rounded-lg flex items-center justify-center border shrink-0 transition-all"
             style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}
             onMouseEnter={e => {
@@ -286,15 +329,17 @@ function ProductTile({
               ;(e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
               ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-dim)'
               ;(e.currentTarget as HTMLElement).style.background = 'transparent'
-            }}>
+            }}
+          >
             <Pencil className="w-3 h-3" />
           </button>
         </div>
 
-        {/* Stock number */}
+        {/* Big available number */}
         <div>
-          <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-            Ready Stock
+          <p className="text-[10px] uppercase tracking-wider"
+            style={{ color: 'var(--text-secondary)' }}>
+            Available
           </p>
           <p className="text-4xl font-black leading-none mt-0.5" style={{ color: statusColor }}>
             {product.stock_qty.toLocaleString()}
@@ -304,9 +349,29 @@ function ProductTile({
           </p>
         </div>
 
+        {/* Produced / Sold mini row */}
+        {product.produced_qty > 0 && (
+          <div className="flex items-center gap-3 text-[10px]"
+            style={{ color: 'var(--text-dim)' }}>
+            <span>
+              <span style={{ color: 'var(--text-secondary)' }}>Produced</span>{' '}
+              <strong style={{ color: 'var(--text-primary)' }}>
+                {product.produced_qty}
+              </strong>
+            </span>
+            <span>·</span>
+            <span>
+              <span style={{ color: 'var(--text-secondary)' }}>Sold</span>{' '}
+              <strong style={{ color: '#f59e0b' }}>
+                {product.total_sold}
+              </strong>
+            </span>
+          </div>
+        )}
+
         <div className="border-t" style={{ borderColor: 'var(--border-dim)' }} />
 
-        {/* Price + value in selected currency */}
+        {/* Avg price + stock value */}
         <div className="grid grid-cols-2 gap-2">
           <div>
             <p className="text-[10px] uppercase tracking-wider mb-0.5"
@@ -315,7 +380,7 @@ function ProductTile({
             </p>
             <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
               {avgPrice > 0
-                ? fmtVal(avgPrice)
+                ? (currency === 'INR' ? fmtINR(avgPrice) : fmtUSD(avgPrice))
                 : <span style={{ color: 'var(--text-dim)' }}>—</span>}
             </p>
           </div>
@@ -325,25 +390,25 @@ function ProductTile({
               Stock Value
             </p>
             <p className="text-sm font-bold" style={{ color: 'var(--accent)' }}>
-              {stockValue > 0
-                ? fmtVal(stockValue)
+              {stockVal > 0
+                ? (currency === 'INR' ? fmtINR(stockVal) : fmtUSD(stockVal))
                 : <span style={{ color: 'var(--text-dim)' }}>—</span>}
             </p>
           </div>
         </div>
 
-        {/* Orders revenue */}
+        {/* Revenue from orders */}
         {product.total_sold > 0 && (
           <div className="rounded-lg px-3 py-2 flex items-center justify-between"
             style={{ background: 'var(--bg-secondary)' }}>
             <div className="flex items-center gap-1.5">
               <ShoppingCart className="w-3 h-3" style={{ color: 'var(--text-dim)' }} />
               <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-                {product.total_sold.toLocaleString()} sold
+                {product.total_sold} sold
               </span>
             </div>
             <span className="text-[10px] font-semibold" style={{ color: '#10b981' }}>
-              {fmtVal(revenue)}
+              {currency === 'INR' ? fmtINR(revenue) : fmtUSD(revenue)}
             </span>
           </div>
         )}
@@ -382,16 +447,6 @@ export default function ProductStockClient({
 
   const refresh = () => startTransition(() => router.refresh())
 
-  const fmtINR = (n: number) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
-  const fmtUSD = (n: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n)
-
-  const fmt = (inr: number) => currency === 'INR' ? fmtINR(inr) : fmtUSD(inr * usdRate)
-
-  const totalStockValue = currency === 'INR' ? totalStockValueInr : totalStockValueUsd
-  const totalRevDisp    = currency === 'INR' ? totalRevenue : totalRevenue * usdRate
-
   const filtered = products.filter(p =>
     !search ||
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -400,6 +455,9 @@ export default function ProductStockClient({
 
   const inStock  = products.filter(p => p.stock_qty > 0).length
   const outStock = products.filter(p => p.stock_qty === 0).length
+
+  const totalStockValue = currency === 'INR' ? totalStockValueInr : totalStockValueUsd
+  const totalRevDisp    = currency === 'INR' ? totalRevenue : totalRevenue * usdRate
 
   return (
     <>
@@ -413,10 +471,9 @@ export default function ProductStockClient({
 
       <div className="px-4 sm:px-6 md:px-10 py-6 space-y-6">
 
-        {/* Top row: total value + currency toggle */}
+        {/* Total value + currency toggle */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
 
-          {/* Total value */}
           <div
             className="rounded-2xl border p-5 flex-1"
             style={{
@@ -473,13 +530,30 @@ export default function ProductStockClient({
           </div>
         </div>
 
-        {/* Summary stats */}
+        {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: 'Total Revenue',  value: currency === 'INR' ? fmtINR(totalRevenue) : fmtUSD(totalRevDisp), color: '#10b981',  sub: 'from orders' },
-            { label: 'Units Sold',     value: totalUnitsSold.toLocaleString(),                                    color: '#8b5cf6',  sub: 'all orders' },
-            { label: 'In Stock',       value: String(inStock),                                                    color: '#10b981',  sub: 'products' },
-            { label: 'Out of Stock',   value: String(outStock),                                                   color: outStock > 0 ? '#ef4444' : '#10b981', sub: 'products' },
+            {
+              label: 'Total Revenue',
+              value: currency === 'INR' ? fmtINR(totalRevenue) : fmtUSD(totalRevDisp),
+              color: '#10b981', sub: 'from orders',
+            },
+            {
+              label: 'Units Sold',
+              value: totalUnitsSold.toLocaleString(),
+              color: '#8b5cf6', sub: 'all orders',
+            },
+            {
+              label: 'In Stock',
+              value: String(inStock),
+              color: '#10b981', sub: 'products available',
+            },
+            {
+              label: 'Out of Stock',
+              value: String(outStock),
+              color: outStock > 0 ? '#ef4444' : '#10b981',
+              sub: 'products',
+            },
           ].map(stat => (
             <div key={stat.label}
               className="rounded-2xl border p-4"
@@ -499,9 +573,9 @@ export default function ProductStockClient({
           style={{ background: 'var(--accent-soft)', borderColor: 'var(--accent-border)' }}>
           <ShoppingCart className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
           <p className="text-xs" style={{ color: 'var(--accent)' }}>
-            Stock quantity = <strong>ready goods</strong> (update manually) ·
-            Revenue auto-reflects all orders ·
-            Avg price from orders used if not set manually.
+            <strong>Available = Produced − Sold.</strong>{' '}
+            Set produced qty when you manufacture a batch. Orders auto-deduct from available.
+            Avg sell price auto-pulled from order history if not set.
           </p>
         </div>
 
@@ -522,7 +596,7 @@ export default function ProductStockClient({
           />
         </div>
 
-        {/* Tiles */}
+        {/* Product tiles */}
         {filtered.length === 0 ? (
           <div className="rounded-2xl border py-16 text-center"
             style={{ background: 'var(--bg-card)', borderColor: 'var(--border-dim)' }}>

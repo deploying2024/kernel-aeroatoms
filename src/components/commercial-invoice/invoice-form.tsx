@@ -15,6 +15,7 @@ import {
   FileText, Truck,
 } from 'lucide-react'
 import { generateInvoiceHTML, type PrintOptions } from './invoice-pdf'
+import type { AddressEntry } from './address-book-modal'
 
 type LineItem = {
   description    : string
@@ -27,18 +28,6 @@ type Sender = {
   name: string; address: string
   city: string; phone: string; email: string; gstin?: string
 }
-
-type AddressEntry = {
-  id               : string
-  recipient_name   : string
-  recipient_company: string | null
-  recipient_address: string
-  recipient_city   : string
-  recipient_pincode: string
-  recipient_phone  : string
-}
-
-export type PrintOptions_ = PrintOptions
 
 const emptyLine = (): LineItem => ({
   description    : '',
@@ -119,12 +108,12 @@ export default function InvoiceForm({
 }) {
   const router = useRouter()
 
-  // ── Address book ──
-  const [addressBook,   setAddressBook]   = useState<AddressEntry[]>([])
-  const [mode,          setMode]          = useState<'pick' | 'new'>('pick')
-  const [search,        setSearch]        = useState('')
-  const [dropOpen,      setDropOpen]      = useState(false)
-  const [selectedAddr,  setSelectedAddr]  = useState<AddressEntry | null>(null)
+  // ── Address book (self-fetched) ──
+  const [addressBook,  setAddressBook]  = useState<AddressEntry[]>([])
+  const [mode,         setMode]         = useState<'pick' | 'new'>('pick')
+  const [search,       setSearch]       = useState('')
+  const [dropOpen,     setDropOpen]     = useState(false)
+  const [selectedAddr, setSelectedAddr] = useState<AddressEntry | null>(null)
 
   // ── Invoice meta ──
   const [invoiceNumber, setInvoiceNumber] = useState(`INV-${Date.now().toString().slice(-6)}`)
@@ -138,7 +127,7 @@ export default function InvoiceForm({
   const [consigneeCity,    setConsigneeCity]    = useState('')
   const [consigneePhone,   setConsigneePhone]   = useState('')
 
-  // ── Form ──
+  // ── Form state ──
   const [notes,              setNotes]              = useState('')
   const [totalWeight,        setTotalWeight]        = useState('')
   const [printInvoice,       setPrintInvoice]       = useState(true)
@@ -147,10 +136,10 @@ export default function InvoiceForm({
   const [submitting,         setSubmitting]         = useState(false)
   const [error,              setError]              = useState<string | null>(null)
 
-  // ── Fetch address book from shipping_labels ──
+  // ── Fetch address book on mount ──
   useEffect(() => {
-    const sb = createClient()
-    sb.from('shipping_labels')
+    createClient()
+      .from('shipping_labels')
       .select('id, recipient_name, recipient_company, recipient_address, recipient_city, recipient_pincode, recipient_phone')
       .order('created_at', { ascending: false })
       .then(({ data }) => setAddressBook(data ?? []))
@@ -172,7 +161,7 @@ export default function InvoiceForm({
     setSearch('')
   }
 
-  // ── Active consignee ──
+  // ── Active consignee values ──
   const consignee = mode === 'pick' && selectedAddr ? {
     name   : selectedAddr.recipient_name,
     company: selectedAddr.recipient_company ?? '',
@@ -209,6 +198,26 @@ export default function InvoiceForm({
 
     setSubmitting(true)
     const sb = createClient()
+
+    // ✅ FIX: Auto-save new consignee to shipping_labels address book
+    if (mode === 'new' && consignee.name.trim()) {
+      const cityRaw = consignee.city.trim()
+      const dashIdx = cityRaw.lastIndexOf(' - ')
+      const cityName = dashIdx !== -1 ? cityRaw.slice(0, dashIdx).trim() : cityRaw
+      const pincode  = dashIdx !== -1 ? cityRaw.slice(dashIdx + 3).trim() : ''
+
+      const { data: saved } = await sb.from('shipping_labels').insert({
+        recipient_name    : consignee.name.trim(),
+        recipient_company : consignee.company.trim() || null,
+        recipient_address : consignee.address.trim(),
+        recipient_city    : cityName,
+        recipient_pincode : pincode,
+        recipient_phone   : consignee.phone.trim(),
+      }).select().single()
+
+      // Update local address book so it's immediately available
+      if (saved) setAddressBook(prev => [saved, ...prev])
+    }
 
     const { data: inv, error: invErr } = await sb
       .from('commercial_invoices')
@@ -409,9 +418,7 @@ export default function InvoiceForm({
                         {filteredAddresses.length === 0 ? (
                           <div className="px-4 py-8 text-center">
                             <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
-                              {addressBook.length === 0
-                                ? 'No saved addresses yet'
-                                : 'No matches found'}
+                              {addressBook.length === 0 ? 'No saved addresses yet' : 'No matches found'}
                             </p>
                             <button
                               onClick={() => { setMode('new'); setDropOpen(false) }}
@@ -484,8 +491,7 @@ export default function InvoiceForm({
                         <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                           {selectedAddr.recipient_city} — {selectedAddr.recipient_pincode}
                         </p>
-                        <p className="text-xs font-semibold mt-0.5"
-                          style={{ color: 'var(--text-primary)' }}>
+                        <p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--text-primary)' }}>
                           {selectedAddr.recipient_phone}
                         </p>
                       </div>
@@ -499,7 +505,7 @@ export default function InvoiceForm({
                   </div>
                 )}
 
-                {!selectedAddr && addressBook.length > 0 && (
+                {!selectedAddr && (
                   <p className="text-xs text-center" style={{ color: 'var(--text-dim)' }}>
                     Not in the list?{' '}
                     <button onClick={() => setMode('new')}
@@ -515,10 +521,10 @@ export default function InvoiceForm({
             {mode === 'new' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {([
-                  ['Name *',   consigneeName,    setConsigneeName,    'e.g. Aryaman Shinde'],
-                  ['Company',  consigneeCompany, setConsigneeCompany, 'e.g. Starvex Technologies'],
-                  ['Phone *',  consigneePhone,   setConsigneePhone,   'e.g. 7506054509'],
-                  ['City *',   consigneeCity,    setConsigneeCity,    'e.g. Mumbai - 400072'],
+                  ['Name *',   consigneeName,    setConsigneeName,    'e.g. Aryaman Shinde'       ],
+                  ['Company',  consigneeCompany, setConsigneeCompany, 'e.g. Starvex Technologies' ],
+                  ['Phone *',  consigneePhone,   setConsigneePhone,   'e.g. 7506054509'           ],
+                  ['City *',   consigneeCity,    setConsigneeCity,    'e.g. Mumbai - 400072'      ],
                 ] as const).map(([label, val, setter, ph]) => (
                   <div key={label} className="space-y-1.5">
                     <Label className="text-xs font-semibold uppercase tracking-wider"
@@ -537,7 +543,8 @@ export default function InvoiceForm({
                     className="h-10 border rounded-lg text-sm" style={inputStyle} />
                 </div>
                 <p className="text-[11px] sm:col-span-2" style={{ color: 'var(--text-dim)' }}>
-                  💡 Enter city as "Mumbai - 400072" to auto-fill Code/ZIP on shipping label
+                  💡 Enter city as "Mumbai - 400072" to auto-fill Code/ZIP on shipping label.
+                  This customer will be saved to your address book automatically.
                 </p>
               </div>
             )}

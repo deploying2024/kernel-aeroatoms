@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { format, parseISO } from 'date-fns'
@@ -9,7 +9,7 @@ import {
   FileText, Building2, Phone,
   MapPin, ChevronLeft, ChevronRight,
   Weight, X, Save, CalendarIcon,
-  Search, BookUser,
+  BookUser,
 } from 'lucide-react'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import InvoiceForm from './invoice-form'
 import { generateInvoiceHTML, type PrintOptions } from './invoice-pdf'
+import AddressBookModal from './address-book-modal'
 
 const fmtINR = (n: number) =>
   new Intl.NumberFormat('en-IN', {
@@ -56,297 +57,7 @@ type Invoice = {
   commercial_invoice_items: InvoiceItem[]
 }
 
-type AddressEntry = {
-  id               : string
-  recipient_name   : string
-  recipient_company: string | null
-  recipient_address: string
-  recipient_city   : string
-  recipient_pincode: string
-  recipient_phone  : string
-}
-
 const PAGE_SIZE = 10
-
-// ── Address Book Modal ───────────────────────────────────────────────────────
-function AddressBookModal({ onClose }: { onClose: () => void }) {
-  const [addresses, setAddresses] = useState<AddressEntry[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [editId,    setEditId]    = useState<string | null>(null)
-  const [search,    setSearch]    = useState('')
-  const [saving,    setSaving]    = useState(false)
-
-  const [eName,    setEName]    = useState('')
-  const [eCompany, setECompany] = useState('')
-  const [eAddress, setEAddress] = useState('')
-  const [eCity,    setECity]    = useState('')
-  const [ePincode, setEPincode] = useState('')
-  const [ePhone,   setEPhone]   = useState('')
-
-  useEffect(() => {
-    createClient()
-      .from('shipping_labels')
-      .select('id, recipient_name, recipient_company, recipient_address, recipient_city, recipient_pincode, recipient_phone')
-      .order('created_at', { ascending: false })
-      .then(({ data }) => { setAddresses(data ?? []); setLoading(false) })
-  }, [])
-
-  const filtered = addresses.filter(a =>
-    !search ||
-    a.recipient_name.toLowerCase().includes(search.toLowerCase()) ||
-    (a.recipient_company ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    a.recipient_city.toLowerCase().includes(search.toLowerCase()) ||
-    a.recipient_phone.includes(search)
-  )
-
-  const openEdit = (a: AddressEntry) => {
-    setEditId(a.id)
-    setEName(a.recipient_name)
-    setECompany(a.recipient_company ?? '')
-    setEAddress(a.recipient_address)
-    setECity(a.recipient_city)
-    setEPincode(a.recipient_pincode)
-    setEPhone(a.recipient_phone)
-  }
-
-  const handleSave = async () => {
-    if (!editId) return
-    setSaving(true)
-    await createClient()
-      .from('shipping_labels')
-      .update({
-        recipient_name    : eName.trim(),
-        recipient_company : eCompany.trim() || null,
-        recipient_address : eAddress.trim(),
-        recipient_city    : eCity.trim(),
-        recipient_pincode : ePincode.trim(),
-        recipient_phone   : ePhone.trim(),
-      })
-      .eq('id', editId)
-
-    setAddresses(prev => prev.map(a => a.id === editId ? {
-      ...a,
-      recipient_name    : eName.trim(),
-      recipient_company : eCompany.trim() || null,
-      recipient_address : eAddress.trim(),
-      recipient_city    : eCity.trim(),
-      recipient_pincode : ePincode.trim(),
-      recipient_phone   : ePhone.trim(),
-    } : a))
-
-    setSaving(false)
-    setEditId(null)
-  }
-
-  const inputStyle = {
-    background : 'var(--bg-input)',
-    borderColor: 'var(--border-dim)',
-    color      : 'var(--text-primary)',
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div
-        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border shadow-2xl"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--accent-border)' }}
-      >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-6 py-4 border-b sticky top-0 z-10"
-          style={{ borderColor: 'var(--border-dim)', background: 'var(--bg-card)' }}
-        >
-          <div>
-            <p className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
-              Address Book
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-              {addresses.length} saved addresses — click ✎ to edit
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center border"
-            style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4">
-          {/* Search */}
-          <div className="relative">
-            <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-              style={{ color: 'var(--text-dim)' }}
-            />
-            <Input
-              placeholder="Search name, company, city or phone…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9 h-10 border rounded-lg text-sm"
-              style={inputStyle}
-            />
-          </div>
-
-          {loading ? (
-            <div className="py-12 text-center">
-              <div
-                className="w-6 h-6 border-2 rounded-full animate-spin mx-auto"
-                style={{ borderColor: 'var(--border-dim)', borderTopColor: 'var(--accent)' }}
-              />
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="py-12 text-center">
-              <BookUser
-                className="w-10 h-10 mx-auto mb-3 opacity-20"
-                style={{ color: 'var(--text-primary)' }}
-              />
-              <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
-                {addresses.length === 0 ? 'No saved addresses yet' : 'No matches found'}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filtered.map(addr => (
-                <div key={addr.id}>
-                  {editId === addr.id ? (
-                    /* ── Inline edit form ── */
-                    <div
-                      className="rounded-xl border p-4 space-y-3"
-                      style={{ background: 'var(--accent-soft)', borderColor: 'var(--accent-border)' }}
-                    >
-                      <p className="text-xs font-bold uppercase tracking-wider"
-                        style={{ color: 'var(--accent)' }}>
-                        Editing — {addr.recipient_name}
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {([
-                          ['Name *',    eName,    setEName,    'e.g. Rahul Sharma'    ],
-                          ['Company',   eCompany, setECompany, 'e.g. XYZ Pvt. Ltd.'  ],
-                          ['Phone *',   ePhone,   setEPhone,   '+91 98765 43210'      ],
-                          ['City *',    eCity,    setECity,    'e.g. Mumbai'          ],
-                          ['Pincode *', ePincode, setEPincode, 'e.g. 400072'         ],
-                        ] as const).map(([label, val, setter, ph]) => (
-                          <div key={label} className="space-y-1">
-                            <Label
-                              className="text-[10px] font-semibold uppercase tracking-wider"
-                              style={{ color: 'var(--text-secondary)' }}
-                            >
-                              {label}
-                            </Label>
-                            <Input
-                              placeholder={ph} value={val}
-                              onChange={e => (setter as any)(e.target.value)}
-                              className="h-9 border rounded-lg text-sm"
-                              style={inputStyle}
-                            />
-                          </div>
-                        ))}
-                        <div className="col-span-2 space-y-1">
-                          <Label
-                            className="text-[10px] font-semibold uppercase tracking-wider"
-                            style={{ color: 'var(--text-secondary)' }}
-                          >
-                            Address *
-                          </Label>
-                          <Input
-                            placeholder="Street / Building / Area"
-                            value={eAddress}
-                            onChange={e => setEAddress(e.target.value)}
-                            className="h-9 border rounded-lg text-sm"
-                            style={inputStyle}
-                          />
-                        </div>
-                      </div>
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          onClick={handleSave}
-                          disabled={saving}
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
-                          style={{ background: 'var(--accent)', color: '#fff' }}
-                        >
-                          <Save className="w-3.5 h-3.5" />
-                          {saving ? 'Saving…' : 'Save Changes'}
-                        </button>
-                        <button
-                          onClick={() => setEditId(null)}
-                          className="px-4 py-2 rounded-lg text-sm border"
-                          style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    /* ── Address card ── */
-                    <div
-                      className="flex items-start justify-between gap-3 p-4 rounded-xl border transition-all"
-                      style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-dim)' }}
-                      onMouseEnter={e =>
-                        (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-dim)'}
-                      onMouseLeave={e =>
-                        (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-dim)'}
-                    >
-                      <div className="flex items-start gap-3 min-w-0">
-                        <div
-                          className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-black shrink-0"
-                          style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
-                        >
-                          {addr.recipient_name[0]?.toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
-                            {addr.recipient_name}
-                          </p>
-                          {addr.recipient_company && (
-                            <p className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
-                              {addr.recipient_company}
-                            </p>
-                          )}
-                          <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-dim)' }}>
-                            {addr.recipient_address}
-                          </p>
-                          <p className="text-xs" style={{ color: 'var(--text-dim)' }}>
-                            {addr.recipient_city} — {addr.recipient_pincode}
-                          </p>
-                          <p className="text-xs font-semibold mt-0.5"
-                            style={{ color: 'var(--text-secondary)' }}>
-                            {addr.recipient_phone}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => openEdit(addr)}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center border shrink-0 transition-all"
-                        style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}
-                        onMouseEnter={e => {
-                          ;(e.currentTarget as HTMLElement).style.color = 'var(--accent)'
-                          ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--accent-border)'
-                          ;(e.currentTarget as HTMLElement).style.background = 'var(--accent-soft)'
-                        }}
-                        onMouseLeave={e => {
-                          ;(e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
-                          ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-dim)'
-                          ;(e.currentTarget as HTMLElement).style.background = 'transparent'
-                        }}
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ── Edit Invoice Modal ───────────────────────────────────────────────────────
 function EditModal({
@@ -413,10 +124,8 @@ function EditModal({
         className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border shadow-2xl"
         style={{ background: 'var(--bg-card)', borderColor: 'var(--accent-border)' }}
       >
-        <div
-          className="flex items-center justify-between px-6 py-4 border-b sticky top-0 z-10"
-          style={{ borderColor: 'var(--border-dim)', background: 'var(--bg-card)' }}
-        >
+        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 z-10"
+          style={{ borderColor: 'var(--border-dim)', background: 'var(--bg-card)' }}>
           <div>
             <p className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
               Edit Invoice
@@ -425,11 +134,9 @@ function EditModal({
               {invoice.invoice_number}
             </p>
           </div>
-          <button
-            onClick={onClose}
+          <button onClick={onClose}
             className="w-8 h-8 rounded-lg flex items-center justify-center border"
-            style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}
-          >
+            style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -437,31 +144,20 @@ function EditModal({
         <div className="p-6 space-y-4">
           {/* Date */}
           <div className="space-y-1.5">
-            <Label
-              className="text-xs font-semibold uppercase tracking-wider"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Invoice Date
-            </Label>
+            <Label className="text-xs font-semibold uppercase tracking-wider"
+              style={{ color: 'var(--text-secondary)' }}>Invoice Date</Label>
             <Popover open={calOpen} onOpenChange={setCalOpen}>
               <PopoverTrigger asChild>
-                <button
-                  className="flex items-center gap-2 w-full h-10 px-3 border rounded-lg text-sm"
-                  style={{ background: 'var(--bg-input)', borderColor: 'var(--border-dim)', color: 'var(--text-primary)' }}
-                >
+                <button className="flex items-center gap-2 w-full h-10 px-3 border rounded-lg text-sm"
+                  style={{ background: 'var(--bg-input)', borderColor: 'var(--border-dim)', color: 'var(--text-primary)' }}>
                   <CalendarIcon className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
                   {format(date, 'dd MMM yyyy')}
                 </button>
               </PopoverTrigger>
-              <PopoverContent
-                className="w-auto p-0"
-                style={{ background: 'var(--bg-card)', borderColor: 'var(--border-dim)' }}
-              >
-                <Calendar
-                  mode="single" selected={date}
-                  onSelect={d => { if (d) { setDate(d); setCalOpen(false) } }}
-                  initialFocus
-                />
+              <PopoverContent className="w-auto p-0"
+                style={{ background: 'var(--bg-card)', borderColor: 'var(--border-dim)' }}>
+                <Calendar mode="single" selected={date}
+                  onSelect={d => { if (d) { setDate(d); setCalOpen(false) } }} initialFocus />
               </PopoverContent>
             </Popover>
           </div>
@@ -475,106 +171,64 @@ function EditModal({
               ['City *',   city,    setCity,    'City - Pincode'   ],
             ] as const).map(([label, val, setter, ph]) => (
               <div key={label} className="space-y-1.5">
-                <Label
-                  className="text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  {label}
-                </Label>
-                <Input
-                  placeholder={ph} value={val}
+                <Label className="text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: 'var(--text-secondary)' }}>{label}</Label>
+                <Input placeholder={ph} value={val}
                   onChange={e => (setter as any)(e.target.value)}
                   className="h-10 border rounded-lg text-sm"
-                  style={{ background: 'var(--bg-input)', borderColor: 'var(--border-dim)', color: 'var(--text-primary)' }}
-                />
+                  style={{ background: 'var(--bg-input)', borderColor: 'var(--border-dim)', color: 'var(--text-primary)' }} />
               </div>
             ))}
             <div className="space-y-1.5 sm:col-span-2">
-              <Label
-                className="text-xs font-semibold uppercase tracking-wider"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                Address *
-              </Label>
-              <Input
-                placeholder="Street / Building / Area"
-                value={address}
-                onChange={e => setAddress(e.target.value)}
+              <Label className="text-xs font-semibold uppercase tracking-wider"
+                style={{ color: 'var(--text-secondary)' }}>Address *</Label>
+              <Input placeholder="Street / Building / Area"
+                value={address} onChange={e => setAddress(e.target.value)}
                 className="h-10 border rounded-lg text-sm"
-                style={{ background: 'var(--bg-input)', borderColor: 'var(--border-dim)', color: 'var(--text-primary)' }}
-              />
+                style={{ background: 'var(--bg-input)', borderColor: 'var(--border-dim)', color: 'var(--text-primary)' }} />
             </div>
           </div>
 
           {/* Notes + Weight */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label
-                className="text-xs font-semibold uppercase tracking-wider"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                Notes
-              </Label>
-              <Input
-                placeholder="e.g. For Personal Use"
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                className="h-10 border rounded-lg text-sm"
-                style={{ background: 'var(--bg-input)', borderColor: 'var(--border-dim)', color: 'var(--text-primary)' }}
-              />
+              <Label className="text-xs font-semibold uppercase tracking-wider"
+                style={{ color: 'var(--text-secondary)' }}>Notes</Label>
+              <Input placeholder="e.g. For Personal Use"
+                value={notes} onChange={e => setNotes(e.target.value)}
+                className="h-10 border rounded-lg text-sm" style={inputStyle} />
             </div>
             <div className="space-y-1.5">
-              <Label
-                className="text-xs font-semibold uppercase tracking-wider"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                Weight (KG)
-              </Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider"
+                style={{ color: 'var(--text-secondary)' }}>Weight (KG)</Label>
               <div className="relative">
-                <Input
-                  type="number" min={0} step="0.01" placeholder="0.0"
-                  value={weight}
-                  onChange={e => setWeight(e.target.value)}
-                  className="h-10 border rounded-lg text-sm pr-10"
-                  style={{ background: 'var(--bg-input)', borderColor: 'var(--border-dim)', color: 'var(--text-primary)' }}
-                />
-                <span
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs pointer-events-none"
-                  style={{ color: 'var(--text-dim)' }}
-                >
-                  KG
-                </span>
+                <Input type="number" min={0} step="0.01" placeholder="0.0"
+                  value={weight} onChange={e => setWeight(e.target.value)}
+                  className="h-10 border rounded-lg text-sm pr-10" style={inputStyle} />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs pointer-events-none"
+                  style={{ color: 'var(--text-dim)' }}>KG</span>
               </div>
             </div>
           </div>
 
           {error && (
-            <div
-              className="px-4 py-3 rounded-lg text-sm"
-              style={{ background: '#ef444410', border: '1px solid #ef444430', color: '#ef4444' }}
-            >
+            <div className="px-4 py-3 rounded-lg text-sm"
+              style={{ background: '#ef444410', border: '1px solid #ef444430', color: '#ef4444' }}>
               ⚠ {error}
             </div>
           )}
 
-          <div
-            className="flex items-center gap-3 pt-2 border-t"
-            style={{ borderColor: 'var(--border-dim)' }}
-          >
-            <button
-              onClick={handleSave}
-              disabled={saving}
+          <div className="flex items-center gap-3 pt-2 border-t"
+            style={{ borderColor: 'var(--border-dim)' }}>
+            <button onClick={handleSave} disabled={saving}
               className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50"
-              style={{ background: 'var(--accent)', color: '#fff' }}
-            >
+              style={{ background: 'var(--accent)', color: '#fff' }}>
               <Save className="w-4 h-4" />
               {saving ? 'Saving…' : 'Save Changes'}
             </button>
-            <button
-              onClick={onClose}
+            <button onClick={onClose}
               className="px-4 py-2.5 rounded-lg text-sm border"
-              style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}
-            >
+              style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
               Cancel
             </button>
           </div>
@@ -634,11 +288,9 @@ function PrintDialog({
               {invoice.invoice_number} · {invoice.consignee_name}
             </p>
           </div>
-          <button
-            onClick={onClose}
+          <button onClick={onClose}
             className="w-7 h-7 rounded-lg flex items-center justify-center border"
-            style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}
-          >
+            style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -763,13 +415,13 @@ export default function CommercialInvoiceClient({
 }) {
   const router = useRouter()
 
-  const [showForm,      setShowForm]      = useState(false)
-  const [showAddrBook,  setShowAddrBook]  = useState(false)
-  const [editInvoice,   setEditInvoice]   = useState<Invoice | null>(null)
-  const [printInvoice,  setPrintInvoice]  = useState<Invoice | null>(null)
-  const [confirmDel,    setConfirmDel]    = useState<string | null>(null)
-  const [deleting,      setDeleting]      = useState(false)
-  const [page,          setPage]          = useState(1)
+  const [showForm,     setShowForm]     = useState(false)
+  const [showAddrBook, setShowAddrBook] = useState(false)
+  const [editInvoice,  setEditInvoice]  = useState<Invoice | null>(null)
+  const [printInvoice, setPrintInvoice] = useState<Invoice | null>(null)
+  const [confirmDel,   setConfirmDel]   = useState<string | null>(null)
+  const [deleting,     setDeleting]     = useState(false)
+  const [page,         setPage]         = useState(1)
 
   const totalPages = Math.max(1, Math.ceil(invoices.length / PAGE_SIZE))
   const paginated  = invoices.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -1162,34 +814,25 @@ export default function CommercialInvoiceClient({
                     Page {page} of {totalPages} · {invoices.length} invoices
                   </p>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page === 1}
+                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                       className="w-8 h-8 rounded-lg flex items-center justify-center border disabled:opacity-30"
-                      style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}
-                    >
+                      style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
                       <ChevronLeft className="w-4 h-4" />
                     </button>
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                      <button
-                        key={p}
-                        onClick={() => setPage(p)}
+                      <button key={p} onClick={() => setPage(p)}
                         className="w-8 h-8 rounded-lg text-sm font-medium border"
                         style={{
                           background  : page === p ? 'var(--accent)' : 'transparent',
                           borderColor : page === p ? 'var(--accent)' : 'var(--border-dim)',
                           color       : page === p ? '#fff' : 'var(--text-secondary)',
-                        }}
-                      >
+                        }}>
                         {p}
                       </button>
                     ))}
-                    <button
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
+                    <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
                       className="w-8 h-8 rounded-lg flex items-center justify-center border disabled:opacity-30"
-                      style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}
-                    >
+                      style={{ borderColor: 'var(--border-dim)', color: 'var(--text-secondary)' }}>
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>

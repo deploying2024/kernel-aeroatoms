@@ -26,7 +26,15 @@ export default async function ProductStockPage() {
       supabase.from('order_items').select('product_id, quantity, price_per_unit'),
     ])
 
-  const stockMap = new Map<string, { quantity: number; avg_sell_price: number; notes: string | null; updated_at: string }>()
+  const inrToUsd = usdRate
+
+  // Build stock map (manually entered produced qty)
+  const stockMap = new Map<string, {
+    quantity      : number
+    avg_sell_price: number
+    notes         : string | null
+    updated_at    : string
+  }>()
   ;(stockRows ?? []).forEach((s: any) => {
     stockMap.set(s.product_id, {
       quantity       : s.quantity ?? 0,
@@ -36,37 +44,46 @@ export default async function ProductStockPage() {
     })
   })
 
+  // Build sold map (from orders)
   const soldMap = new Map<string, { total_qty: number; total_revenue: number }>()
   ;(orderItems ?? []).forEach((oi: any) => {
     const prev = soldMap.get(oi.product_id) ?? { total_qty: 0, total_revenue: 0 }
     soldMap.set(oi.product_id, {
-      total_qty    : prev.total_qty     + (oi.quantity ?? 0),
+      total_qty    : prev.total_qty     + (oi.quantity       ?? 0),
       total_revenue: prev.total_revenue + ((oi.quantity ?? 0) * (oi.price_per_unit ?? 0)),
     })
   })
 
-  const inrToUsd = usdRate
-
   const productList = (products ?? []).map((p: any) => {
-    const stock = stockMap.get(p.id) ?? { quantity: 0, avg_sell_price: p.unit_price ?? 0, notes: null, updated_at: '' }
-    const sold  = soldMap.get(p.id)  ?? { total_qty: 0, total_revenue: 0 }
+    const stock = stockMap.get(p.id) ?? {
+      quantity: 0, avg_sell_price: p.unit_price ?? 0, notes: null, updated_at: '',
+    }
+    const sold = soldMap.get(p.id) ?? { total_qty: 0, total_revenue: 0 }
+
+    // avg sell price: manual > from orders > unit_price
     const avgSellPrice = stock.avg_sell_price > 0
       ? stock.avg_sell_price
-      : sold.total_qty > 0 ? sold.total_revenue / sold.total_qty : (p.unit_price ?? 0)
+      : sold.total_qty > 0
+        ? sold.total_revenue / sold.total_qty
+        : (p.unit_price ?? 0)
+
+    // available = produced - sold (floored at 0)
+    const available = Math.max(0, stock.quantity - sold.total_qty)
 
     return {
-      id            : p.id,
-      name          : p.name,
-      sku           : p.sku,
-      unit_price    : p.unit_price ?? 0,
-      stock_qty     : stock.quantity,
-      avg_sell_price: avgSellPrice,
-      stock_value_inr: stock.quantity * avgSellPrice,
-      stock_value_usd: stock.quantity * avgSellPrice * inrToUsd,
-      total_sold    : sold.total_qty,
-      total_revenue : sold.total_revenue,
-      notes         : stock.notes,
-      updated_at    : stock.updated_at,
+      id             : p.id,
+      name           : p.name,
+      sku            : p.sku ?? '',
+      unit_price     : p.unit_price ?? 0,
+      produced_qty   : stock.quantity,
+      stock_qty      : available,
+      avg_sell_price : avgSellPrice,
+      stock_value_inr: available * avgSellPrice,
+      stock_value_usd: available * avgSellPrice * inrToUsd,
+      total_sold     : sold.total_qty,
+      total_revenue  : sold.total_revenue,
+      notes          : stock.notes,
+      updated_at     : stock.updated_at,
     }
   })
 
@@ -95,7 +112,7 @@ export default async function ProductStockPage() {
                 Product Stock
               </h1>
               <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                Finished goods inventory · auto-reflects orders
+                Finished goods · available = produced − sold
               </p>
             </div>
           </div>
