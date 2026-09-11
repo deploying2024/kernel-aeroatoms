@@ -116,13 +116,17 @@ export default function BatchesTab({
   }
 
   const handleDelete = async (batchId: string, batchName: string, hasShipped: boolean) => {
-    if (hasShipped) {
-      alert(`Cannot delete "${batchName}" — it has shipped units. Flag individual units in the Lookup tab instead.`)
-      return
-    }
-    if (!confirm(`Delete batch "${batchName}" and all its serials? This cannot be undone.`)) return
+    const msg = hasShipped
+      ? `"${batchName}" has shipped units. Deleting will remove all serial records. This cannot be undone. Continue?`
+      : `Delete batch "${batchName}" and all its serials? This cannot be undone.`
+    if (!confirm(msg)) return
     setDeletingId(batchId)
     const sb = createClient()
+    // Delete events for all units in this batch first
+    const { data: units } = await sb.from('product_units').select('serial').eq('batch_id', batchId)
+    if (units?.length) {
+      await sb.from('unit_events').delete().in('serial', units.map(u => u.serial))
+    }
     await sb.from('product_units').delete().eq('batch_id', batchId)
     await sb.from('product_batches').delete().eq('id', batchId)
     setDeletingId(null)
