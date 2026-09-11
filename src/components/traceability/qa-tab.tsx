@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useRef, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,8 +18,6 @@ type ScannedUnit = {
 }
 
 export default function QaTab({ batches }: { batches: Batch[] }) {
-  const router    = useRouter()
-  const [, start] = useTransition()
   const scanRef   = useRef<HTMLInputElement>(null)
 
   const [scanned,    setScanned]    = useState<ScannedUnit | null>(null)
@@ -140,7 +137,7 @@ export default function QaTab({ batches }: { batches: Batch[] }) {
     setLastResult({ serial: scanned.serial, passed })
 
     setSubmitting(false)
-    start(() => router.refresh())
+    window.location.reload()
     reset()
   }
 
