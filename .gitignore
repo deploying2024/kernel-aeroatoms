@@ -53,3 +53,4 @@ next-env.d.ts
 .open-next/
 .wrangler/
 wrangler.toml
+certificates

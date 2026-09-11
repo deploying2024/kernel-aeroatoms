@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ['pdf-lib', 'qrcode'],
+
   images: {
     unoptimized: true,
   },
@@ -9,6 +11,20 @@ const nextConfig: NextConfig = {
   },
   typescript: {
     ignoreBuildErrors: true,
+  },
+
+  async headers() {
+    return [
+      {
+        source : '/(.*)',
+        headers: [
+          {
+            key  : 'Permissions-Policy',
+            value: 'camera=*, microphone=(), geolocation=()',
+          },
+        ],
+      },
+    ]
   },
 }
 
