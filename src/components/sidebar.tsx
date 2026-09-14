@@ -9,7 +9,7 @@ import {
   PackageMinus, BarChart3, Gauge, Truck,
   Calculator, LogOut, Plane,
   ChevronLeft, ChevronRight, Menu, X,
-  Sun, Moon,FileText,ScanLine, Boxes,QrCode,
+  Sun, Moon,FileText,ScanLine, Boxes,QrCode,FileSpreadsheet,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTheme } from 'next-themes'
@@ -26,6 +26,7 @@ const navItems = [
   { label: 'Cost Price',      href: '/cost-price',        icon: Calculator      },
   { label: 'Generate Invoice', href: '/commercial-invoice', icon: FileText },
   { label: 'BOM Tracker', href: '/bom-tracker', icon: ScanLine },
+  { label: 'BOM Tools', href: '/bom-labels', icon: FileSpreadsheet },
   { label: 'Traceability', href: '/traceability', icon: QrCode },
 
  
