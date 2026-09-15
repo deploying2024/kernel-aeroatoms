@@ -45,6 +45,8 @@ async function makeSerial(productCode: string, date?: Date): Promise<string> {
   return `${body}-${sig}`
 }
 
+const MAX_BATCH_QTY = 10_000
+
 export async function createBatch(
   productId     : string,
   productName   : string,
@@ -53,6 +55,10 @@ export async function createBatch(
   notes         : string | null,
   manufacturedOn: string,
 ): Promise<{ error: string } | { batchId: string }> {
+  if (!Number.isInteger(qty) || qty < 1 || qty > MAX_BATCH_QTY) {
+    return { error: `Quantity must be a whole number between 1 and ${MAX_BATCH_QTY}` }
+  }
+
   const supabase = await createClient()
 
   const code    = productName.split(' ').pop()

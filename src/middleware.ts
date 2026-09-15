@@ -42,13 +42,39 @@ export async function middleware(request: NextRequest) {
   const isAuthenticated = !!user && !error
 
   // Security headers
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+  // Next.js dev mode (Fast Refresh / webpack eval-source-maps) needs
+  // 'unsafe-eval' to run at all — without it, client components never
+  // hydrate. Production builds don't use eval, so keep this dev-only.
+  const scriptSrc = process.env.NODE_ENV === 'development'
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+    : "script-src 'self' 'unsafe-inline'"
+  const csp = [
+    "default-src 'self'",
+    // 'unsafe-inline' is required: Next.js streams RSC payloads via inline
+    // <script> tags, and the app has its own inline session-watcher script.
+    scriptSrc,
+    // Inline style attributes (style={{ ... }}) are used throughout for theming.
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    `connect-src 'self'${supabaseUrl ? ` ${supabaseUrl}` : ''}`,
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; ')
+
   const securityHeaders: Record<string, string> = {
     'X-Frame-Options'          : 'DENY',
     'X-Content-Type-Options'   : 'nosniff',
     'Referrer-Policy'          : 'strict-origin-when-cross-origin',
-    'Permissions-Policy'       : 'camera=(), microphone=(), geolocation=()',
+    // QA tab uses the device camera for live QR scanning (camera-scanner.tsx) —
+    // only geolocation/microphone are actually unused, so only those are blocked.
+    'Permissions-Policy'       : 'camera=(self), microphone=(), geolocation=()',
     'X-XSS-Protection'         : '1; mode=block',
     'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+    'Content-Security-Policy' : csp,
   }
 
   // Login route
