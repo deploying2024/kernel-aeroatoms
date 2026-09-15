@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, ShoppingCart, PackagePlus,
-  PackageMinus, BarChart3, Gauge, Truck,
+  PackageMinus, BarChart3, Truck,
   Calculator, LogOut, Plane,
   ChevronLeft, ChevronRight, Menu, X,
   Sun, Moon,FileText,ScanLine, Boxes,QrCode,FileSpreadsheet,
@@ -22,7 +22,6 @@ const navItems = [
   { label: 'Outscan',         href: '/outscan',           icon: PackageMinus    },
   { label: 'Inventory Value', href: '/inventory-value',   icon: BarChart3       },
   { label: 'Product Stock', href: '/product-stock', icon: Boxes },
-  { label: 'Yield Rate',      href: '/yield-rate',        icon: Gauge           },
   { label: 'Cost Price',      href: '/cost-price',        icon: Calculator      },
   { label: 'Generate Invoice', href: '/commercial-invoice', icon: FileText },
   { label: 'BOM Tracker', href: '/bom-tracker', icon: ScanLine },
