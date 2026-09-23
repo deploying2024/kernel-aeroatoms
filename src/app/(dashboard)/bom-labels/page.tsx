@@ -84,7 +84,7 @@ async function generatePdfBlob(rows: BomRow[], orderNo: string): Promise<Blob> {
   const LINE_H = 4.2
   const PAD_X  = 2
   const PAD_Y  = 1.2
-  const FSZ    = 8
+  const FSZ    = 11
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
 
